@@ -17,6 +17,7 @@
 # env
 .env
 .env*.local
+_neon.txt
 
 # uploaded media (keep the folder, ignore its contents)
 /public/uploads/*

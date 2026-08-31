@@ -9,11 +9,11 @@
     "start": "next start",
     "lint": "next lint",
     "postinstall": "prisma generate",
-    "vercel-build": "prisma generate && prisma migrate deploy && next build",
-    "db:migrate": "prisma migrate dev --name init",
+    "vercel-build": "prisma generate && prisma db push --accept-data-loss && node prisma/seed.mjs && next build",
+    "db:push": "prisma db push",
     "db:seed": "node prisma/seed.mjs",
     "db:studio": "prisma studio",
-    "setup": "prisma migrate dev --name init && node prisma/seed.mjs"
+    "setup": "prisma db push && node prisma/seed.mjs"
   },
   "prisma": {
     "seed": "node prisma/seed.mjs"
