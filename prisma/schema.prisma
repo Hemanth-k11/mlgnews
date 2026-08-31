@@ -1,0 +1,117 @@
+// Prisma schema — the shape of the database.
+// Docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String    @id @default(cuid())
+  email     String    @unique
+  name      String
+  password  String // bcrypt hash, never plain text
+  role      String    @default("editor") // "admin" | "editor" | "author"
+  createdAt DateTime  @default(now())
+  articles  Article[]
+}
+
+model Category {
+  id       String    @id @default(cuid())
+  name     String    @unique
+  slug     String    @unique
+  blurb    String? // one-line description shown on the section page
+  order    Int       @default(0) // controls order in the nav
+  articles Article[]
+}
+
+model Article {
+  id          String    @id @default(cuid())
+  title       String
+  slug        String    @unique
+  summary     String    @default("")
+  body        String    @default("") // Markdown
+  heroImage   String? // image URL (paste one in the admin)
+  heroAlt     String?
+  heroCaption String?
+  status      String    @default("draft") // "draft" | "published"
+  featured    Boolean   @default(false) // the one story in the homepage hero
+  tags        String    @default("") // comma-separated, kept simple for v1
+  views       Int       @default(0) // powers "Most Read"
+  publishedAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  categoryId String
+  category   Category @relation(fields: [categoryId], references: [id])
+  authorId   String
+  author     User     @relation(fields: [authorId], references: [id])
+
+  editionItems EditionItem[]
+  images       ArticleImage[]
+
+  @@index([status, publishedAt])
+  @@index([categoryId])
+}
+
+// Extra images attached to an article (the "in pictures" gallery).
+// The main/hero image stays on Article.heroImage.
+model ArticleImage {
+  id        String   @id @default(cuid())
+  url       String
+  alt       String   @default("")
+  caption   String   @default("")
+  order     Int      @default(0)
+  createdAt DateTime @default(now())
+
+  articleId String
+  article   Article @relation(fields: [articleId], references: [id], onDelete: Cascade)
+
+  @@index([articleId, order])
+}
+
+// One dated "digital edition" of the paper (the e-Paper).
+model Edition {
+  id        String   @id @default(cuid())
+  date      DateTime @unique // stored at UTC midnight; one edition per day
+  title     String   @default("The Chronicle") // nameplate line
+  strapline String   @default("Digital Edition")
+  status    String   @default("draft") // "draft" | "published"
+  pdfUrl    String? // optional link to a real print-replica PDF
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  items EditionItem[]
+}
+
+// A banner advertisement for one placement on the site. Managed from /admin/ads.
+model Ad {
+  id        String   @id @default(cuid())
+  placement String   @unique // "home-rail" | "article-rail" | "section-rail"
+  name      String   @default("Ad slot") // internal label
+  imageUrl  String   @default("") // uploaded file path or external URL
+  linkUrl   String   @default("") // click-through target
+  alt       String   @default("Advertisement")
+  active    Boolean  @default(true)
+  updatedAt DateTime @updatedAt
+}
+
+// A story placed on a page of an edition.
+model EditionItem {
+  id         String  @id @default(cuid())
+  page       Int     @default(1)
+  order      Int     @default(0)
+  prominence String  @default("standard") // "lead" | "standard" | "brief"
+
+  editionId String
+  edition   Edition @relation(fields: [editionId], references: [id], onDelete: Cascade)
+  articleId String
+  article   Article @relation(fields: [articleId], references: [id], onDelete: Cascade)
+
+  @@unique([editionId, articleId])
+  @@index([editionId, page, order])
+}
