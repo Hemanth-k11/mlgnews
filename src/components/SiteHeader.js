@@ -1,10 +1,12 @@
 import Link from "next/link";
 import { getSections } from "@/lib/queries";
 import { formatDate } from "@/lib/format";
+import { getReaderSession } from "@/lib/auth";
 import Nav from "./Nav";
 
 export default async function SiteHeader() {
   const sections = await getSections();
+  const reader = await getReaderSession();
 
   return (
     <>
@@ -14,7 +16,14 @@ export default async function SiteHeader() {
           <span className="util__links">
             <Link href="/epaper">e-Paper</Link>
             <a href="#">Subscribe</a>
-            <Link href="/admin/login">Sign In</Link>
+            {reader ? (
+              <Link href="/account">{reader.name}</Link>
+            ) : (
+              <>
+                <Link href="/login">Sign In</Link>
+                <Link href="/signup">Sign Up</Link>
+              </>
+            )}
           </span>
         </div>
       </div>

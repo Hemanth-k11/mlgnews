@@ -21,6 +21,16 @@ model User {
   articles  Article[]
 }
 
+// A public reader account (sign up / sign in on the site). Separate from
+// User, which is staff (admin/editor/author) and can access /admin.
+model Reader {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String
+  password  String // bcrypt hash, never plain text
+  createdAt DateTime @default(now())
+}
+
 model Category {
   id       String    @id @default(cuid())
   name     String    @unique

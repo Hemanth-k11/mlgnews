@@ -3,7 +3,15 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { prisma } from "./db";
-import { getSession, createSession, destroySession, verifyPassword } from "./auth";
+import {
+  getSession,
+  createSession,
+  destroySession,
+  verifyPassword,
+  hashPassword,
+  createReaderSession,
+  destroyReaderSession,
+} from "./auth";
 import { slugify, dayStartUTC, parseISODate, toISODate } from "./format";
 import { saveUpload, deleteUpload } from "./upload";
 
@@ -32,6 +40,64 @@ export async function loginAction(_prevState, formData) {
 export async function logoutAction() {
   destroySession();
   redirect("/admin/login");
+}
+
+// ---------- Reader accounts (public sign up / sign in) ----------
+
+function safeNext(next, fallback) {
+  // Only ever redirect within the site — never to an external URL.
+  return next && next.startsWith("/") ? next : fallback;
+}
+
+export async function readerSignupAction(_prevState, formData) {
+  const name = String(formData.get("name") || "").trim();
+  const email = String(formData.get("email") || "").toLowerCase().trim();
+  const password = String(formData.get("password") || "");
+  const next = safeNext(String(formData.get("next") || ""), "/account");
+
+  if (!name || !email || !password) {
+    return { error: "Fill in your name, email and password." };
+  }
+  if (password.length < 8) {
+    return { error: "Password must be at least 8 characters." };
+  }
+
+  const existing = await prisma.reader.findUnique({ where: { email } });
+  if (existing) {
+    return { error: "An account with that email already exists. Try signing in instead." };
+  }
+
+  const reader = await prisma.reader.create({
+    data: { name, email, password: await hashPassword(password) },
+  });
+
+  await createReaderSession(reader);
+  redirect(next);
+}
+
+export async function readerLoginAction(_prevState, formData) {
+  const email = String(formData.get("email") || "").toLowerCase().trim();
+  const password = String(formData.get("password") || "");
+  const next = safeNext(String(formData.get("next") || ""), "/account");
+
+  if (!email || !password) {
+    return { error: "Enter your email and password." };
+  }
+
+  const reader = await prisma.reader.findUnique({ where: { email } });
+  const ok = reader && (await verifyPassword(password, reader.password));
+  if (!ok) {
+    // One generic message — don't reveal which field was wrong.
+    return { error: "Email or password is incorrect." };
+  }
+
+  await createReaderSession(reader);
+  redirect(next);
+}
+
+export async function readerLogoutAction() {
+  destroyReaderSession();
+  redirect("/");
 }
 
 // ---------- Articles ----------

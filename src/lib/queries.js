@@ -165,6 +165,7 @@ export async function adminListAds() {
 
 export async function getLatestPublishedEdition() {
   return prisma.edition.findFirst({
+    
     where: { status: "published" },
     orderBy: { date: "desc" },
   });
