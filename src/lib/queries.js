@@ -82,6 +82,23 @@ export async function getArticleBySlug(slug) {
   });
 }
 
+export async function getArticleEngagement(articleId, readerId) {
+  const [likeCount, liked, comments] = await Promise.all([
+    prisma.like.count({ where: { articleId } }),
+    readerId
+      ? prisma.like
+          .findUnique({ where: { articleId_readerId: { articleId, readerId } } })
+          .then(Boolean)
+      : Promise.resolve(false),
+    prisma.comment.findMany({
+      where: { articleId },
+      orderBy: { createdAt: "desc" },
+      include: { reader: { select: { name: true } } },
+    }),
+  ]);
+  return { likeCount, liked, comments };
+}
+
 export async function getRelated(article, take = 3) {
   return prisma.article.findMany({
     where: {

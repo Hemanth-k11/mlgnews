@@ -29,6 +29,37 @@ model Reader {
   name      String
   password  String // bcrypt hash, never plain text
   createdAt DateTime @default(now())
+
+  likes    Like[]
+  comments Comment[]
+}
+
+// One reader's like on one article.
+model Like {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+
+  articleId String
+  article   Article @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  readerId  String
+  reader    Reader  @relation(fields: [readerId], references: [id], onDelete: Cascade)
+
+  @@unique([articleId, readerId])
+  @@index([articleId])
+}
+
+// A reader's comment on an article.
+model Comment {
+  id        String   @id @default(cuid())
+  body      String
+  createdAt DateTime @default(now())
+
+  articleId String
+  article   Article @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  readerId  String
+  reader    Reader  @relation(fields: [readerId], references: [id], onDelete: Cascade)
+
+  @@index([articleId, createdAt])
 }
 
 model Category {
@@ -64,6 +95,8 @@ model Article {
 
   editionItems EditionItem[]
   images       ArticleImage[]
+  likes        Like[]
+  comments     Comment[]
 
   @@index([status, publishedAt])
   @@index([categoryId])

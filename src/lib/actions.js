@@ -9,6 +9,7 @@ import {
   destroySession,
   verifyPassword,
   hashPassword,
+  getReaderSession,
   createReaderSession,
   destroyReaderSession,
 } from "./auth";
@@ -98,6 +99,45 @@ export async function readerLoginAction(_prevState, formData) {
 export async function readerLogoutAction() {
   destroyReaderSession();
   redirect("/");
+}
+
+async function requireReaderSession(next) {
+  const session = await getReaderSession();
+  if (!session) redirect(`/login?next=${encodeURIComponent(next)}`);
+  return session;
+}
+
+// ---------- Likes & comments (readers) ----------
+
+export async function toggleLikeAction(formData) {
+  const articleId = String(formData.get("articleId") || "");
+  const slug = String(formData.get("slug") || "");
+  const session = await requireReaderSession(`/article/${slug}`);
+
+  const existing = await prisma.like.findUnique({
+    where: { articleId_readerId: { articleId, readerId: session.id } },
+  });
+  if (existing) {
+    await prisma.like.delete({ where: { id: existing.id } });
+  } else {
+    await prisma.like.create({ data: { articleId, readerId: session.id } });
+  }
+  revalidatePath(`/article/${slug}`);
+  redirect(`/article/${slug}`);
+}
+
+export async function addCommentAction(_prevState, formData) {
+  const articleId = String(formData.get("articleId") || "");
+  const slug = String(formData.get("slug") || "");
+  const session = await requireReaderSession(`/article/${slug}`);
+
+  const body = String(formData.get("body") || "").trim();
+  if (!body) return { error: "Write something before posting." };
+  if (body.length > 2000) return { error: "Comments are limited to 2000 characters." };
+
+  await prisma.comment.create({ data: { articleId, readerId: session.id, body } });
+  revalidatePath(`/article/${slug}`);
+  return { ok: true };
 }
 
 // ---------- Articles ----------

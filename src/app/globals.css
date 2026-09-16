@@ -662,7 +662,7 @@ img {
   display: flex;
   gap: 6px;
 }
-.a-byline .share span {
+.a-byline .share button {
   width: 30px;
   height: 30px;
   border: 1px solid var(--rule-strong);
@@ -672,6 +672,39 @@ img {
   font-size: 0.6rem;
   color: var(--muted);
   font-weight: 700;
+  background: var(--paper);
+  cursor: pointer;
+}
+.a-byline .share button:hover {
+  color: var(--red);
+  border-color: var(--red);
+}
+.like-form {
+  margin-left: 12px;
+}
+.like-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 12px;
+  border: 1px solid var(--rule-strong);
+  border-radius: 15px;
+  background: var(--paper);
+  color: var(--muted);
+  font: inherit;
+  font-size: 0.72rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+.like-btn:hover {
+  border-color: var(--red);
+  color: var(--red);
+}
+.like-btn--active {
+  border-color: var(--red);
+  color: var(--red);
+  background: var(--red-tint);
 }
 .caption {
   font-size: 0.7rem;
@@ -786,6 +819,46 @@ img {
   padding: 0 10px;
   font-size: 0.74rem;
   color: var(--muted);
+}
+.cbox .c-fld {
+  width: 100%;
+  background: var(--paper);
+  border: 1px solid var(--rule-strong);
+  padding: 10px;
+  font: inherit;
+  font-size: 0.82rem;
+  color: var(--ink);
+  resize: vertical;
+  margin-bottom: 10px;
+}
+.c-list {
+  margin-top: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.c-item {
+  border-top: 1px solid var(--rule);
+  padding-top: 12px;
+}
+.c-item__head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+.c-item__head b {
+  font-size: 0.8rem;
+}
+.c-item__head span {
+  font-size: 0.68rem;
+  color: var(--muted);
+}
+.c-item p {
+  font-size: 0.85rem;
+  color: var(--body);
+  line-height: 1.6;
+  white-space: pre-wrap;
 }
 
 /* ---------- Section / search pages ---------- */
