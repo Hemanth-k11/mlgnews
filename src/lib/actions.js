@@ -2,7 +2,10 @@
 
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
+import crypto from "crypto";
+import { headers } from "next/headers";
 import { prisma } from "./db";
+import { sendWelcomeEmail, sendPasswordResetEmail } from "./email";
 import {
   getSession,
   createSession,
@@ -15,6 +18,8 @@ import {
 } from "./auth";
 import { slugify, dayStartUTC, parseISODate, toISODate } from "./format";
 import { saveUpload, deleteUpload } from "./upload";
+
+const AVATAR_MAX_BYTES = 800 * 1024; // 800 KB, per user
 
 // ---------- Auth ----------
 
@@ -54,6 +59,8 @@ export async function readerSignupAction(_prevState, formData) {
   const name = String(formData.get("name") || "").trim();
   const email = String(formData.get("email") || "").toLowerCase().trim();
   const password = String(formData.get("password") || "");
+  const requestAdmin = formData.get("requestAdmin") === "on";
+  const adminRequestNote = String(formData.get("adminRequestNote") || "").trim().slice(0, 500);
   const next = safeNext(String(formData.get("next") || ""), "/account");
 
   if (!name || !email || !password) {
@@ -69,8 +76,20 @@ export async function readerSignupAction(_prevState, formData) {
   }
 
   const reader = await prisma.reader.create({
-    data: { name, email, password: await hashPassword(password) },
+    data: {
+      name,
+      email,
+      password: await hashPassword(password),
+      adminRequestStatus: requestAdmin ? "pending" : "none",
+      adminRequestNote: requestAdmin ? adminRequestNote : "",
+    },
   });
+
+  try {
+    await sendWelcomeEmail(reader.email, reader.name);
+  } catch (e) {
+    console.error("Failed to send welcome email:", e);
+  }
 
   await createReaderSession(reader);
   redirect(next);
@@ -99,6 +118,99 @@ export async function readerLoginAction(_prevState, formData) {
 export async function readerLogoutAction() {
   destroyReaderSession();
   redirect("/");
+}
+
+// A signed-in staff member approves a reader's request for /admin access —
+// this creates their staff (User) account, reusing the password they
+// already set as a reader so they can sign in with it right away.
+export async function approveAdminRequestAction(formData) {
+  await requireSession();
+  const readerId = String(formData.get("readerId") || "");
+  const reader = await prisma.reader.findUnique({ where: { id: readerId } });
+
+  if (reader && reader.adminRequestStatus === "pending") {
+    const clash = await prisma.user.findUnique({ where: { email: reader.email } });
+    if (!clash) {
+      await prisma.user.create({
+        data: {
+          email: reader.email,
+          name: reader.name,
+          password: reader.password,
+          role: "editor",
+        },
+      });
+    }
+    await prisma.reader.update({
+      where: { id: readerId },
+      data: { adminRequestStatus: "approved" },
+    });
+  }
+  revalidatePath("/admin/requests");
+  redirect("/admin/requests?approved=1");
+}
+
+export async function rejectAdminRequestAction(formData) {
+  await requireSession();
+  const readerId = String(formData.get("readerId") || "");
+  await prisma.reader
+    .update({ where: { id: readerId }, data: { adminRequestStatus: "rejected" } })
+    .catch(() => {});
+  revalidatePath("/admin/requests");
+  redirect("/admin/requests?rejected=1");
+}
+
+function baseUrl() {
+  const host = headers().get("host") || "localhost:3000";
+  const proto = host.startsWith("localhost") || host.startsWith("127.") ? "http" : "https";
+  return `${proto}://${host}`;
+}
+
+export async function requestPasswordResetAction(_prevState, formData) {
+  const email = String(formData.get("email") || "").toLowerCase().trim();
+  // Same message whether or not the account exists — don't reveal who has one.
+  const ok = { ok: "If an account exists for that email, we've sent a reset link." };
+  if (!email) return { error: "Enter your email." };
+
+  const reader = await prisma.reader.findUnique({ where: { email } });
+  if (reader) {
+    const token = crypto.randomBytes(32).toString("hex");
+    await prisma.passwordResetToken.create({
+      data: { token, readerId: reader.id, expiresAt: new Date(Date.now() + 60 * 60 * 1000) },
+    });
+    try {
+      await sendPasswordResetEmail(reader.email, `${baseUrl()}/reset-password?token=${token}`);
+    } catch (e) {
+      console.error("Failed to send password reset email:", e);
+    }
+  }
+  return ok;
+}
+
+export async function resetPasswordAction(_prevState, formData) {
+  const token = String(formData.get("token") || "");
+  const password = String(formData.get("password") || "");
+  const confirm = String(formData.get("confirm") || "");
+
+  if (!token) return { error: "Missing reset token." };
+  if (password.length < 8) return { error: "Password must be at least 8 characters." };
+  if (password !== confirm) return { error: "Passwords don't match." };
+
+  const record = await prisma.passwordResetToken.findUnique({ where: { token } });
+  if (!record || record.usedAt || record.expiresAt < new Date()) {
+    return { error: "This reset link is invalid or has expired. Request a new one." };
+  }
+
+  const reader = await prisma.reader.update({
+    where: { id: record.readerId },
+    data: { password: await hashPassword(password) },
+  });
+  await prisma.passwordResetToken.update({
+    where: { id: record.id },
+    data: { usedAt: new Date() },
+  });
+
+  await createReaderSession(reader);
+  redirect("/account?reset=1");
 }
 
 async function requireReaderSession(next) {
@@ -140,12 +252,168 @@ export async function addCommentAction(_prevState, formData) {
   return { ok: true };
 }
 
+// ---------- Reader profile ----------
+
+const USERNAME_RE = /^[a-z0-9_]{3,20}$/;
+
+export async function updateReaderProfileAction(_prevState, formData) {
+  const session = await requireReaderSession("/account");
+
+  const name = String(formData.get("name") || "").trim();
+  const username = String(formData.get("username") || "").trim().toLowerCase();
+  const dobRaw = String(formData.get("dateOfBirth") || "");
+  const city = String(formData.get("city") || "").trim();
+  const address = String(formData.get("address") || "").trim();
+  const bio = String(formData.get("bio") || "").trim().slice(0, 1000);
+  const profession = String(formData.get("profession") || "").trim();
+
+  if (!name) return { error: "Name is required." };
+  if (username && !USERNAME_RE.test(username)) {
+    return { error: "Username must be 3-20 characters: lowercase letters, numbers, underscores." };
+  }
+  if (username) {
+    const clash = await prisma.reader.findFirst({
+      where: { username, NOT: { id: session.id } },
+      select: { id: true },
+    });
+    if (clash) return { error: "That username is already taken." };
+  }
+
+  let dateOfBirth = null;
+  if (dobRaw) {
+    dateOfBirth = new Date(dobRaw);
+    if (Number.isNaN(dateOfBirth.getTime())) return { error: "Enter a valid date of birth." };
+  }
+
+  await prisma.reader.update({
+    where: { id: session.id },
+    data: { name, username: username || null, dateOfBirth, city, address, bio, profession },
+  });
+
+  revalidatePath("/account");
+  return { ok: "Profile saved." };
+}
+
+export async function updateReaderAvatarAction(formData) {
+  const session = await requireReaderSession("/account");
+  const result = await saveUpload(formData.get("file"), AVATAR_MAX_BYTES);
+  if (result.url) {
+    const prev = await prisma.reader.findUnique({
+      where: { id: session.id },
+      select: { avatarUrl: true },
+    });
+    await prisma.reader.update({ where: { id: session.id }, data: { avatarUrl: result.url } });
+    if (prev?.avatarUrl && prev.avatarUrl !== result.url) await deleteUpload(prev.avatarUrl);
+  }
+  revalidatePath("/account");
+  redirect(`/account${result.error ? `?imgerror=${encodeURIComponent(result.error)}` : ""}`);
+}
+
+export async function changeReaderPasswordAction(_prevState, formData) {
+  const session = await requireReaderSession("/account");
+
+  const currentPassword = String(formData.get("currentPassword") || "");
+  const newPassword = String(formData.get("newPassword") || "");
+  const confirm = String(formData.get("confirm") || "");
+
+  if (!currentPassword || !newPassword) return { error: "Fill in both password fields." };
+  if (newPassword.length < 8) return { error: "New password must be at least 8 characters." };
+  if (newPassword !== confirm) return { error: "New passwords don't match." };
+
+  const reader = await prisma.reader.findUnique({ where: { id: session.id } });
+  const ok = reader && (await verifyPassword(currentPassword, reader.password));
+  if (!ok) return { error: "Current password is incorrect." };
+
+  await prisma.reader.update({
+    where: { id: session.id },
+    data: { password: await hashPassword(newPassword) },
+  });
+  return { ok: "Password changed." };
+}
+
 // ---------- Articles ----------
 
 async function requireSession() {
   const session = await getSession();
   if (!session) redirect("/admin/login");
   return session;
+}
+
+// ---------- Staff profile ----------
+
+export async function updateStaffProfileAction(_prevState, formData) {
+  const session = await requireSession();
+
+  const name = String(formData.get("name") || "").trim();
+  const username = String(formData.get("username") || "").trim().toLowerCase();
+  const dobRaw = String(formData.get("dateOfBirth") || "");
+  const city = String(formData.get("city") || "").trim();
+  const address = String(formData.get("address") || "").trim();
+  const bio = String(formData.get("bio") || "").trim().slice(0, 1000);
+  const profession = String(formData.get("profession") || "").trim();
+
+  if (!name) return { error: "Name is required." };
+  if (username && !USERNAME_RE.test(username)) {
+    return { error: "Username must be 3-20 characters: lowercase letters, numbers, underscores." };
+  }
+  if (username) {
+    const clash = await prisma.user.findFirst({
+      where: { username, NOT: { id: session.id } },
+      select: { id: true },
+    });
+    if (clash) return { error: "That username is already taken." };
+  }
+
+  let dateOfBirth = null;
+  if (dobRaw) {
+    dateOfBirth = new Date(dobRaw);
+    if (Number.isNaN(dateOfBirth.getTime())) return { error: "Enter a valid date of birth." };
+  }
+
+  await prisma.user.update({
+    where: { id: session.id },
+    data: { name, username: username || null, dateOfBirth, city, address, bio, profession },
+  });
+
+  revalidatePath("/admin/profile");
+  return { ok: "Profile saved." };
+}
+
+export async function updateStaffAvatarAction(formData) {
+  const session = await requireSession();
+  const result = await saveUpload(formData.get("file"), AVATAR_MAX_BYTES);
+  if (result.url) {
+    const prev = await prisma.user.findUnique({
+      where: { id: session.id },
+      select: { avatarUrl: true },
+    });
+    await prisma.user.update({ where: { id: session.id }, data: { avatarUrl: result.url } });
+    if (prev?.avatarUrl && prev.avatarUrl !== result.url) await deleteUpload(prev.avatarUrl);
+  }
+  revalidatePath("/admin/profile");
+  redirect(`/admin/profile${result.error ? `?imgerror=${encodeURIComponent(result.error)}` : ""}`);
+}
+
+export async function changeStaffPasswordAction(_prevState, formData) {
+  const session = await requireSession();
+
+  const currentPassword = String(formData.get("currentPassword") || "");
+  const newPassword = String(formData.get("newPassword") || "");
+  const confirm = String(formData.get("confirm") || "");
+
+  if (!currentPassword || !newPassword) return { error: "Fill in both password fields." };
+  if (newPassword.length < 8) return { error: "New password must be at least 8 characters." };
+  if (newPassword !== confirm) return { error: "New passwords don't match." };
+
+  const user = await prisma.user.findUnique({ where: { id: session.id } });
+  const ok = user && (await verifyPassword(currentPassword, user.password));
+  if (!ok) return { error: "Current password is incorrect." };
+
+  await prisma.user.update({
+    where: { id: session.id },
+    data: { password: await hashPassword(newPassword) },
+  });
+  return { ok: "Password changed." };
 }
 
 export async function newDraftAction() {

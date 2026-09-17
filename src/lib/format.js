@@ -37,6 +37,12 @@ export function timeAgo(d) {
   return `${Math.floor(seconds / 86400)}d ago`;
 }
 
+export function calcAge(dob) {
+  if (!dob) return null;
+  const diffMs = Date.now() - new Date(dob).getTime();
+  return Math.max(0, Math.floor(diffMs / (365.25 * 24 * 60 * 60 * 1000)));
+}
+
 export function splitTags(tags) {
   return String(tags || "")
     .split(",")

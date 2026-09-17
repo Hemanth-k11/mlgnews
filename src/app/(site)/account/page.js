@@ -1,41 +1,104 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getReaderSession } from "@/lib/auth";
-import { readerLogoutAction } from "@/lib/actions";
+import {
+  readerLogoutAction,
+  updateReaderProfileAction,
+  updateReaderAvatarAction,
+  changeReaderPasswordAction,
+} from "@/lib/actions";
 import { prisma } from "@/lib/db";
-import { formatDate } from "@/lib/format";
+import { getReaderLikedArticles } from "@/lib/queries";
+import { formatDate, calcAge } from "@/lib/format";
 import SubmitButton from "@/components/SubmitButton";
+import ProfileForm from "@/components/ProfileForm";
+import AvatarUpload from "@/components/AvatarUpload";
+import ChangePasswordForm from "@/components/ChangePasswordForm";
 
+export const dynamic = "force-dynamic";
 export const metadata = { title: "My account" };
 
-export default async function AccountPage() {
+export default async function AccountPage({ searchParams }) {
   const session = await getReaderSession();
   if (!session) redirect("/login?next=/account");
 
-  const reader = await prisma.reader.findUnique({
-    where: { id: session.id },
-    select: { name: true, email: true, createdAt: true },
-  });
+  const reader = await prisma.reader.findUnique({ where: { id: session.id } });
   if (!reader) redirect("/login?next=/account");
 
+  const liked = await getReaderLikedArticles(reader.id);
+  const age = calcAge(reader.dateOfBirth);
+
   return (
-    <div className="login-page">
-      <div className="login-card">
-        <div className="wordmark">The Chronicle</div>
-        <div className="sub">My account</div>
+    <div className="wrap">
+      <div className="adm-main">
+        {searchParams?.reset && <div className="notice notice--ok">Password updated.</div>}
+        {searchParams?.imgerror && <div className="notice">{searchParams.imgerror}</div>}
 
-        <label>Name</label>
-        <input value={reader.name} readOnly />
+        <div className="adm-toprow">
+          <h1 className="adm-h1">My account</h1>
+          <form action={readerLogoutAction}>
+            <SubmitButton className="a-btn" pendingText="Signing out…">
+              Sign out
+            </SubmitButton>
+          </form>
+        </div>
 
-        <label>Email</label>
-        <input value={reader.email} readOnly />
+        <div className="dash-grid">
+          <div className="dash-col">
+            <section className="side-card">
+              <h3>Profile photo</h3>
+              <AvatarUpload
+                action={updateReaderAvatarAction}
+                avatarUrl={reader.avatarUrl}
+                name={reader.name}
+              />
+              <p className="hint">
+                {reader.email} &middot; can&rsquo;t be changed
+                {age !== null && ` · Age ${age}`}
+                {" · Member since "}
+                {formatDate(reader.createdAt)}
+              </p>
+            </section>
 
-        <p className="demo">Member since {formatDate(reader.createdAt)}</p>
+            <section>
+              <h2 className="section-title">Edit profile</h2>
+              <ProfileForm action={updateReaderProfileAction} profile={reader} />
+            </section>
 
-        <form action={readerLogoutAction}>
-          <SubmitButton className="" pendingText="Signing out…">
-            Sign out
-          </SubmitButton>
-        </form>
+            <section>
+              <h2 className="section-title">Change password</h2>
+              <ChangePasswordForm action={changeReaderPasswordAction} />
+            </section>
+          </div>
+
+          <aside className="dash-col">
+            <section className="side-card">
+              <h3>Activity</h3>
+              <div className="stat-row">
+                <div className="stat">
+                  <b>{liked.length}</b>
+                  <span>Liked</span>
+                </div>
+              </div>
+            </section>
+
+            <section className="side-card">
+              <h3>Liked articles</h3>
+              {liked.length === 0 ? (
+                <p className="hint">You haven&rsquo;t liked any stories yet.</p>
+              ) : (
+                <div className="liked-list">
+                  {liked.map((a) => (
+                    <div key={a.id}>
+                      <span className="cat">{a.category.name}</span>
+                      <Link href={`/article/${a.slug}`}>{a.title}</Link>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </section>
+          </aside>
+        </div>
       </div>
     </div>
   );

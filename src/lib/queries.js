@@ -82,6 +82,15 @@ export async function getArticleBySlug(slug) {
   });
 }
 
+export async function getReaderLikedArticles(readerId) {
+  const likes = await prisma.like.findMany({
+    where: { readerId },
+    orderBy: { createdAt: "desc" },
+    include: { article: { include: { category: true } } },
+  });
+  return likes.map((l) => l.article);
+}
+
 export async function getArticleEngagement(articleId, readerId) {
   const [likeCount, liked, comments] = await Promise.all([
     prisma.like.count({ where: { articleId } }),
@@ -163,6 +172,14 @@ export async function adminGetArticle(id) {
   return prisma.article.findUnique({
     where: { id },
     include: { category: true, images: { orderBy: { order: "asc" } } },
+  });
+}
+
+export async function adminListAdminRequests() {
+  return prisma.reader.findMany({
+    where: { adminRequestStatus: "pending" },
+    orderBy: { createdAt: "asc" },
+    select: { id: true, name: true, email: true, adminRequestNote: true, createdAt: true },
   });
 }
 

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
 import { logoutAction } from "@/lib/actions";
+import { adminListAdminRequests } from "@/lib/queries";
 
 export const dynamic = "force-dynamic";
 
@@ -13,6 +14,8 @@ export default async function DashboardLayout({ children }) {
   const session = await getSession();
   if (!session) redirect("/admin/login");
 
+  const pendingRequests = await adminListAdminRequests();
+
   return (
     <div className="adm">
       <div className="app-bar">
@@ -22,11 +25,17 @@ export default async function DashboardLayout({ children }) {
         <Link href="/admin">Articles</Link>
         <Link href="/admin/editions">Editions</Link>
         <Link href="/admin/ads">Ads</Link>
+        <Link href="/admin/requests">
+          Requests{pendingRequests.length > 0 ? ` (${pendingRequests.length})` : ""}
+        </Link>
+        <Link href="/admin/profile">Profile</Link>
         <Link href="/" target="_blank">
           View site &#8599;
         </Link>
         <span className="spacer" />
-        <span className="who">{session.email}</span>
+        <Link href="/admin/profile" className="who">
+          {session.email}
+        </Link>
         <form action={logoutAction}>
           <button className="a-btn" type="submit">
             Sign out

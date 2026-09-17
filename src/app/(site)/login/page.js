@@ -13,6 +13,9 @@ export default function ReaderLoginPage({ searchParams }) {
         <ReaderLoginForm next={searchParams?.next} />
 
         <p className="demo">
+          <Link href="/forgot-password">Forgot your password?</Link>
+        </p>
+        <p className="demo">
           New here? <Link href="/signup">Create an account</Link>
         </p>
         <p className="demo">

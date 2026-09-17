@@ -30,7 +30,7 @@ export default async function SiteHeader() {
 
       <header className="mast">
         <div className="wrap mast__row">
-          <span className="mast__edition">Bengaluru</span>
+          <span className="mast__edition">INDIA</span>
           <div>
             <Link href="/" className="wordmark">
               The Chronicle

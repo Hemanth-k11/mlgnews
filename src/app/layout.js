@@ -1,4 +1,6 @@
 import "./globals.css";
+import { Suspense } from "react";
+import TopLoader from "@/components/TopLoader";
 
 export const metadata = {
   title: {
@@ -22,7 +24,12 @@ export default function RootLayout({ children }) {
           href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;500;600;700&family=Noto+Serif:wght@400;600;700&display=swap"
         />
       </head>
-      <body>{children}</body>
+      <body>
+        <Suspense fallback={null}>
+          <TopLoader />
+        </Suspense>
+        {children}
+      </body>
     </html>
   );
 }

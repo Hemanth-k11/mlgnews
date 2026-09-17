@@ -1,11 +1,13 @@
 "use client";
 
+import { useState } from "react";
 import { useFormState } from "react-dom";
 import { readerSignupAction } from "@/lib/actions";
 import SubmitButton from "./SubmitButton";
 
 export default function SignupForm({ next }) {
   const [state, formAction] = useFormState(readerSignupAction, {});
+  const [requestAdmin, setRequestAdmin] = useState(false);
 
   return (
     <form action={formAction}>
@@ -26,6 +28,28 @@ export default function SignupForm({ next }) {
         minLength={8}
         required
       />
+
+      <label className="check-row" style={{ marginTop: 14 }}>
+        <input
+          type="checkbox"
+          name="requestAdmin"
+          checked={requestAdmin}
+          onChange={(e) => setRequestAdmin(e.target.checked)}
+        />
+        Request admin access
+      </label>
+
+      {requestAdmin && (
+        <>
+          <label htmlFor="adminRequestNote">Why do you need access? (optional)</label>
+          <textarea
+            id="adminRequestNote"
+            name="adminRequestNote"
+            rows={2}
+            maxLength={500}
+          />
+        </>
+      )}
 
       {state?.error && <div className="form-error">{state.error}</div>}
 

@@ -22,15 +22,20 @@ const UPLOAD_PRESET = process.env.CLOUDINARY_UPLOAD_PRESET;
 const useCloudinary = Boolean(CLOUD_NAME && UPLOAD_PRESET);
 
 // Accepts a web File (from formData.get("file")). Returns { url } or { error }.
-export async function saveUpload(file) {
+// maxBytes lets callers tighten the limit (e.g. profile photos).
+export async function saveUpload(file, maxBytes = MAX_BYTES) {
   if (!file || typeof file.arrayBuffer !== "function" || file.size === 0) {
     return { error: "Choose an image file to upload." };
   }
   if (!EXT_BY_TYPE[file.type]) {
     return { error: "Use a JPG, PNG, WebP, GIF or AVIF image." };
   }
-  if (file.size > MAX_BYTES) {
-    return { error: "Image must be 6 MB or smaller." };
+  if (file.size > maxBytes) {
+    const label =
+      maxBytes >= 1024 * 1024
+        ? `${(maxBytes / (1024 * 1024)).toFixed(1).replace(/\.0$/, "")} MB`
+        : `${Math.round(maxBytes / 1024)} KB`;
+    return { error: `Image must be ${label} or smaller.` };
   }
 
   return useCloudinary ? saveToCloudinary(file) : saveToDisk(file);
