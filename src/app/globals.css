@@ -26,26 +26,10 @@
   color-scheme: light;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    --paper: #171614;
-    --wash: #1f1d1b;
-    --wash-2: #262320;
-    --ink: #f1eee9;
-    --body: #d7d2ca;
-    --muted: #9b958c;
-    --rule: #322e29;
-    --rule-strong: #423d37;
-    --red: #e86a6a;
-    --red-deep: #c1121c;
-    --red-tint: #2e1a1a;
-    --link: #7ca5f0;
-    --ok: #5fbe73;
-    --canvas: #0e0d0c;
-    color-scheme: dark;
-  }
-}
-
+/* The site always uses the light palette above, regardless of the
+   device's OS dark-mode setting, so it looks the same on every screen.
+   :root[data-theme="dark"] below is kept for a possible manual toggle
+   later, but nothing currently sets that attribute. */
 :root[data-theme="dark"] {
   --paper: #171614;
   --wash: #1f1d1b;
