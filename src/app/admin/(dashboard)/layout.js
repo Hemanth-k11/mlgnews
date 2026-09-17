@@ -20,7 +20,7 @@ export default async function DashboardLayout({ children }) {
     <div className="adm">
       <div className="app-bar">
         <Link href="/admin" className="brand">
-          The Chronicle
+          Miryalaguda Chronicle
         </Link>
         <Link href="/admin">Articles</Link>
         <Link href="/admin/editions">Editions</Link>

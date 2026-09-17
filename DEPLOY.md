@@ -1,4 +1,4 @@
-# Deploying The Chronicle
+# Deploying Miryalaguda Chronicle
 
 Local dev uses a SQLite file and saves uploads to disk. Neither works on a hosting
 platform, so deploying means switching two things:

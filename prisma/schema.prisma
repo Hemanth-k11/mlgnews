@@ -160,7 +160,7 @@ model ArticleImage {
 model Edition {
   id        String   @id @default(cuid())
   date      DateTime @unique // stored at UTC midnight; one edition per day
-  title     String   @default("The Chronicle") // nameplate line
+  title     String   @default("Miryalaguda Chronicle") // nameplate line
   strapline String   @default("Digital Edition")
   status    String   @default("draft") // "draft" | "published"
   pdfUrl    String? // optional link to a real print-replica PDF

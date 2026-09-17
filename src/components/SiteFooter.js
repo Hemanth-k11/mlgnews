@@ -26,7 +26,7 @@ export default async function SiteFooter() {
             ))}
           </div>
           <div>
-            <h4>The Chronicle</h4>
+            <h4>Miryalaguda Chronicle</h4>
             <a href="#">About Us</a>
             <a href="#">Code of Ethics</a>
             <a href="#">Contact</a>
@@ -42,7 +42,7 @@ export default async function SiteFooter() {
           </div>
         </div>
         <div className="foot__bar">
-          <span>&copy; {new Date().getFullYear()} The Chronicle. Demo project.</span>
+          <span>&copy; {new Date().getFullYear()} Miryalaguda Chronicle. Demo project.</span>
           <span>Terms &middot; Privacy &middot; Sitemap</span>
         </div>
       </div>

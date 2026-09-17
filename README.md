@@ -1,4 +1,4 @@
-# The Chronicle — dynamic news website
+# Miryalaguda Chronicle — dynamic news website
 
 A working news site built from the approved mockups:
 

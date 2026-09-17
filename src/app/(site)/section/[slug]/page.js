@@ -11,7 +11,7 @@ export async function generateMetadata({ params }) {
   if (!data) return { title: "Section not found" };
   return {
     title: data.category.name,
-    description: data.category.blurb || `${data.category.name} news from The Chronicle.`,
+    description: data.category.blurb || `${data.category.name} news from Miryalaguda Chronicle.`,
   };
 }
 

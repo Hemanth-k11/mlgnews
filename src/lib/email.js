@@ -6,12 +6,12 @@ export async function sendWelcomeEmail(to, name) {
   // this module.
   const resend = new Resend(process.env.RESEND_API_KEY);
   await resend.emails.send({
-    from: "The Chronicle <onboarding@resend.dev>",
+    from: "Miryalaguda Chronicle <onboarding@resend.dev>",
     to,
-    subject: "Welcome to The Chronicle",
+    subject: "Welcome to Miryalaguda Chronicle",
     html: `
       <p>Hi ${name},</p>
-      <p>You created an account on The Chronicle. Thank you for signing up!</p>
+      <p>You created an account on Miryalaguda Chronicle. Thank you for signing up!</p>
     `,
   });
 }
@@ -22,7 +22,7 @@ export async function sendPasswordResetEmail(to, resetUrl) {
   // this module.
   const resend = new Resend(process.env.RESEND_API_KEY);
   await resend.emails.send({
-    from: "The Chronicle <onboarding@resend.dev>",
+    from: "Miryalaguda Chronicle <onboarding@resend.dev>",
     to,
     subject: "Reset your password",
     html: `

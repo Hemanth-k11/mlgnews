@@ -710,7 +710,7 @@ export async function saveEditionAction(_prevState, formData) {
   const parsed = parseISODate(String(formData.get("date") || ""));
   if (!parsed) return { error: "Enter a valid date." };
 
-  const title = String(formData.get("title") || "The Chronicle").trim() || "The Chronicle";
+  const title = String(formData.get("title") || "Miryalaguda Chronicle").trim() || "Miryalaguda Chronicle";
   const strapline = String(formData.get("strapline") || "").trim() || "Digital Edition";
   const status = String(formData.get("status") || "draft");
   const pdfUrl = String(formData.get("pdfUrl") || "").trim() || null;

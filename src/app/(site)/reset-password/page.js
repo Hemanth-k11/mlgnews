@@ -16,7 +16,7 @@ export default async function ResetPasswordPage({ searchParams }) {
   return (
     <div className="login-page">
       <div className="login-card">
-        <div className="wordmark">The Chronicle</div>
+        <div className="wordmark">Miryalaguda Chronicle</div>
         <div className="sub">Set a new password</div>
 
         {valid ? (

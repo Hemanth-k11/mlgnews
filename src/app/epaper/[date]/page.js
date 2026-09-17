@@ -13,7 +13,7 @@ export async function generateMetadata({ params }) {
   if (!d) return { title: "e-Paper" };
   return {
     title: `e-Paper — ${formatLongDate(d)}`,
-    description: `The Chronicle digital edition for ${formatLongDate(d)}.`,
+    description: `Miryalaguda Chronicle digital edition for ${formatLongDate(d)}.`,
   };
 }
 

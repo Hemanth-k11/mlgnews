@@ -254,7 +254,7 @@ async function main() {
     update: { status: "published" },
     create: {
       date: today,
-      title: "The Chronicle",
+      title: "Miryalaguda Chronicle",
       strapline: "Digital Edition",
       status: "published",
     },

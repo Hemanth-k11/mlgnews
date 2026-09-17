@@ -4,11 +4,11 @@ import TopLoader from "@/components/TopLoader";
 
 export const metadata = {
   title: {
-    default: "The Chronicle — News, India and the World",
-    template: "%s — The Chronicle",
+    default: "Miryalaguda Chronicle — News, India and the World",
+    template: "%s — Miryalaguda Chronicle",
   },
   description:
-    "The Chronicle: independent reporting on India, the world, business, sport, science and culture.",
+    "Miryalaguda Chronicle: independent reporting on India, the world, business, sport, science and culture.",
 };
 
 export default function RootLayout({ children }) {

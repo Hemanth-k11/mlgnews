@@ -7,7 +7,7 @@ export default function AdminLoginPage({ searchParams }) {
   return (
     <div className="login-page">
       <div className="login-card">
-        <div className="wordmark">The Chronicle</div>
+        <div className="wordmark">Miryalaguda Chronicle</div>
         <div className="sub">Newsroom Admin</div>
 
         <LoginForm next={searchParams?.next} />
