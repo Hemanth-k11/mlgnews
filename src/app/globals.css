@@ -187,6 +187,8 @@ img {
 }
 .nav__bar {
   position: relative;
+  display: flex;
+  align-items: center;
 }
 .nav__toggle {
   display: none;
@@ -197,6 +199,11 @@ img {
   align-items: center;
   height: 42px;
   overflow-x: auto;
+  flex: 1;
+  min-width: 0;
+}
+.nav__style-switch {
+  display: none;
 }
 .nav a {
   font-size: 0.72rem;
@@ -221,16 +228,36 @@ img {
   font-size: 0.72rem;
 }
 
-/* Phones: collapse the section row into a hamburger-toggled dropdown so
-   adding sections never widens or crowds the bar. Tablet/desktop keep the
-   horizontal row above unchanged. */
+/* Phones: the classic scrolling row (above) is still the default. A small
+   switch lets a visitor opt into a compact hamburger-toggled dropdown
+   instead, remembered per browser. Tablet/desktop are unaffected either way. */
 @media (max-width: 640px) {
   .nav__bar {
     height: 42px;
-    display: flex;
-    align-items: center;
   }
-  .nav__toggle {
+  .nav__style-switch {
+    display: inline-flex;
+    align-items: center;
+    flex: none;
+    margin-left: 8px;
+    font-size: 0.58rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--muted);
+    background: var(--wash);
+    border: 1px solid var(--rule-strong);
+    border-radius: 999px;
+    padding: 5px 9px;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .nav__style-switch:hover {
+    color: var(--red);
+    border-color: var(--red);
+  }
+
+  .nav--compact .nav__toggle {
     display: flex;
     flex-direction: column;
     justify-content: center;
@@ -241,14 +268,15 @@ img {
     border: 0;
     background: transparent;
     cursor: pointer;
+    flex: none;
   }
-  .nav__toggle span {
+  .nav--compact .nav__toggle span {
     display: block;
     height: 2px;
     background: var(--ink);
     border-radius: 2px;
   }
-  .nav__inner {
+  .nav--compact .nav__inner {
     display: none;
     position: absolute;
     top: 100%;
@@ -266,18 +294,18 @@ img {
     padding: 4px 20px 14px;
     gap: 0;
   }
-  .nav__inner.is-open {
+  .nav--compact .nav__inner.is-open {
     display: flex;
   }
-  .nav__inner a {
+  .nav--compact .nav__inner a {
     padding: 11px 0;
     border-bottom: 1px solid var(--rule);
     white-space: normal;
   }
-  .nav__inner a:last-child {
+  .nav--compact .nav__inner a:last-child {
     border-bottom: 0;
   }
-  .nav__search {
+  .nav--compact .nav__search {
     margin-left: 0;
   }
 }
