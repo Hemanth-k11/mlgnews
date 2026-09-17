@@ -183,6 +183,21 @@ export async function adminListAdminRequests() {
   });
 }
 
+export async function adminListStaff() {
+  const staff = await prisma.user.findMany({
+    orderBy: { createdAt: "asc" },
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      role: true,
+      createdAt: true,
+      _count: { select: { articles: true } },
+    },
+  });
+  return staff.map((s) => ({ ...s, articleCount: s._count.articles }));
+}
+
 // --- Advertisements ---
 
 export async function getAd(placement) {

@@ -25,6 +25,9 @@ export default async function AdminArticlesPage({ searchParams }) {
       {searchParams?.deleted && (
         <div className="notice notice--ok">Article deleted.</div>
       )}
+      {searchParams?.error === "forbidden" && (
+        <div className="notice">That page is only available to a super admin.</div>
+      )}
 
       <div className="adm-toprow">
         <h1 className="adm-h1">Articles</h1>

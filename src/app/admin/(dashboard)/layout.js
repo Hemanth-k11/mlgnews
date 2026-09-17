@@ -14,7 +14,8 @@ export default async function DashboardLayout({ children }) {
   const session = await getSession();
   if (!session) redirect("/admin/login");
 
-  const pendingRequests = await adminListAdminRequests();
+  const isSuperAdmin = session.role === "super_admin";
+  const pendingRequests = isSuperAdmin ? await adminListAdminRequests() : [];
 
   return (
     <div className="adm">
@@ -25,9 +26,14 @@ export default async function DashboardLayout({ children }) {
         <Link href="/admin">Articles</Link>
         <Link href="/admin/editions">Editions</Link>
         <Link href="/admin/ads">Ads</Link>
-        <Link href="/admin/requests">
-          Requests{pendingRequests.length > 0 ? ` (${pendingRequests.length})` : ""}
-        </Link>
+        {isSuperAdmin && (
+          <>
+            <Link href="/admin/requests">
+              Requests{pendingRequests.length > 0 ? ` (${pendingRequests.length})` : ""}
+            </Link>
+            <Link href="/admin/staff">Staff</Link>
+          </>
+        )}
         <Link href="/admin/profile">Profile</Link>
         <Link href="/" target="_blank">
           View site &#8599;

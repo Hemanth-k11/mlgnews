@@ -16,7 +16,7 @@ model User {
   email     String    @unique
   name      String
   password  String // bcrypt hash, never plain text
-  role      String    @default("editor") // "admin" | "editor" | "author"
+  role      String    @default("editor") // "super_admin" | "admin" | "editor" | "author"
   createdAt DateTime  @default(now())
   articles  Article[]
 

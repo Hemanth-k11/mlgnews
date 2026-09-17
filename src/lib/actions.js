@@ -134,7 +134,7 @@ export async function readerLogoutAction() {
 // this creates their staff (User) account, reusing the password they
 // already set as a reader so they can sign in with it right away.
 export async function approveAdminRequestAction(formData) {
-  await requireSession();
+  await requireSuperAdmin();
   const readerId = String(formData.get("readerId") || "");
   const reader = await prisma.reader.findUnique({ where: { id: readerId } });
 
@@ -160,7 +160,7 @@ export async function approveAdminRequestAction(formData) {
 }
 
 export async function rejectAdminRequestAction(formData) {
-  await requireSession();
+  await requireSuperAdmin();
   const readerId = String(formData.get("readerId") || "");
   await prisma.reader
     .update({ where: { id: readerId }, data: { adminRequestStatus: "rejected" } })
@@ -347,6 +347,59 @@ async function requireSession() {
   const session = await getSession();
   if (!session) redirect("/admin/login");
   return session;
+}
+
+// Only "super_admin" can approve access requests or manage other staff
+// accounts. Every other staff role keeps today's access (articles,
+// editions, ads, their own profile).
+async function requireSuperAdmin() {
+  const session = await requireSession();
+  if (session.role !== "super_admin") redirect("/admin?error=forbidden");
+  return session;
+}
+
+// ---------- Staff management (super admin only) ----------
+
+const STAFF_ROLES = ["super_admin", "admin", "editor", "author"];
+
+export async function updateStaffRoleAction(formData) {
+  const session = await requireSuperAdmin();
+  const userId = String(formData.get("userId") || "");
+  const role = String(formData.get("role") || "");
+  if (!STAFF_ROLES.includes(role)) redirect("/admin/staff");
+
+  if (userId === session.id && role !== "super_admin") {
+    const superAdminCount = await prisma.user.count({ where: { role: "super_admin" } });
+    if (superAdminCount <= 1) {
+      redirect(`/admin/staff?error=${encodeURIComponent("You can't remove the last super admin.")}`);
+    }
+  }
+
+  await prisma.user.update({ where: { id: userId }, data: { role } });
+  revalidatePath("/admin/staff");
+  redirect("/admin/staff?saved=1");
+}
+
+export async function deleteStaffAction(formData) {
+  const session = await requireSuperAdmin();
+  const userId = String(formData.get("userId") || "");
+
+  if (userId === session.id) {
+    redirect(`/admin/staff?error=${encodeURIComponent("You can't delete your own account while signed in.")}`);
+  }
+
+  const articleCount = await prisma.article.count({ where: { authorId: userId } });
+  if (articleCount > 0) {
+    redirect(
+      `/admin/staff?error=${encodeURIComponent(
+        `This account has authored ${articleCount} article(s). Reassign or delete those first.`
+      )}`
+    );
+  }
+
+  await prisma.user.delete({ where: { id: userId } }).catch(() => {});
+  revalidatePath("/admin/staff");
+  redirect("/admin/staff?deleted=1");
 }
 
 // ---------- Staff profile ----------

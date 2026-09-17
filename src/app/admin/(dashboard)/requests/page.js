@@ -1,3 +1,5 @@
+import { redirect } from "next/navigation";
+import { getSession } from "@/lib/auth";
 import { adminListAdminRequests } from "@/lib/queries";
 import { approveAdminRequestAction, rejectAdminRequestAction } from "@/lib/actions";
 import { formatDateTime } from "@/lib/format";
@@ -7,6 +9,9 @@ export const dynamic = "force-dynamic";
 export const metadata = { title: "Access requests" };
 
 export default async function AdminRequestsPage({ searchParams }) {
+  const session = await getSession();
+  if (session.role !== "super_admin") redirect("/admin?error=forbidden");
+
   const requests = await adminListAdminRequests();
 
   return (

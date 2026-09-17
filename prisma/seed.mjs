@@ -166,18 +166,21 @@ Officials said the feed would also be made public on a website within six months
 async function main() {
   console.log("Seeding database...");
 
-  // 1. Admin user
-  const passwordHash = await bcrypt.hash("admin1234", 10);
-  const admin = await prisma.user.upsert({
-    where: { email: "admin@example.com" },
-    update: {},
-    create: {
-      email: "admin@example.com",
-      name: "Newsroom Admin",
-      password: passwordHash,
-      role: "admin",
-    },
-  });
+  // 1. Admin user — only bootstrap a demo account if this database has no
+  // staff at all yet. Once a real super admin exists, seeding never touches
+  // staff accounts (so re-running `vercel-build` on deploy can't resurrect
+  // a demo account someone deleted).
+  let admin = await prisma.user.findFirst();
+  if (!admin) {
+    admin = await prisma.user.create({
+      data: {
+        email: "admin@example.com",
+        name: "Newsroom Admin",
+        password: await bcrypt.hash("admin1234", 10),
+        role: "super_admin",
+      },
+    });
+  }
 
   // 2. Sections
   const categories = {};
@@ -305,7 +308,7 @@ async function main() {
   }
 
   console.log("Done.");
-  console.log("Admin login:  admin@example.com  /  admin1234");
+  console.log(`Admin account: ${admin.email} (role: ${admin.role})`);
 }
 
 main()
