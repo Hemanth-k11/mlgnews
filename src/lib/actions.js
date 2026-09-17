@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import crypto from "crypto";
 import { headers } from "next/headers";
 import { prisma } from "./db";
-import { sendWelcomeEmail, sendPasswordResetEmail } from "./email";
+import { sendWelcomeEmail, sendAdminSignupNotification, sendPasswordResetEmail } from "./email";
 import {
   getSession,
   createSession,
@@ -89,6 +89,16 @@ export async function readerSignupAction(_prevState, formData) {
     await sendWelcomeEmail(reader.email, reader.name);
   } catch (e) {
     console.error("Failed to send welcome email:", e);
+  }
+
+  try {
+    const admins = await prisma.user.findMany({
+      where: { role: "admin" },
+      select: { email: true },
+    });
+    await sendAdminSignupNotification(admins.map((a) => a.email), reader);
+  } catch (e) {
+    console.error("Failed to send admin signup notification:", e);
   }
 
   await createReaderSession(reader);
