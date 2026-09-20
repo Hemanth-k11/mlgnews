@@ -13,11 +13,6 @@ export default function AdminLoginPage({ searchParams }) {
         <LoginForm next={searchParams?.next} />
 
         <p className="demo">
-          Demo account
-          <br />
-          <b>admin@example.com</b> &nbsp;/&nbsp; <b>admin1234</b>
-        </p>
-        <p className="demo">
           <Link href="/">&larr; Back to the site</Link>
         </p>
       </div>

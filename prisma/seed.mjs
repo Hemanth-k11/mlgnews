@@ -1,4 +1,5 @@
-// Fills the database with a demo admin user, the sections, and sample stories.
+// Fills the database with the first admin user, the sections, and sample stories.
+// The admin is only created on an empty database, using SEED_ADMIN_PASSWORD.
 // Run with:  npm run db:seed
 import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcryptjs";
@@ -170,16 +171,27 @@ async function main() {
   // staff at all yet. Once a real super admin exists, seeding never touches
   // staff accounts (so re-running `vercel-build` on deploy can't resurrect
   // a demo account someone deleted).
+  // The password comes from SEED_ADMIN_PASSWORD so it never lives in the repo.
   let admin = await prisma.user.findFirst();
   if (!admin) {
-    admin = await prisma.user.create({
-      data: {
-        email: "admin@example.com",
-        name: "Newsroom Admin",
-        password: await bcrypt.hash("admin1234", 10),
-        role: "super_admin",
-      },
-    });
+    const adminPassword = process.env.SEED_ADMIN_PASSWORD;
+    if (adminPassword) {
+      admin = await prisma.user.create({
+        data: {
+          email: "karlapati.hemanth@gmail.com",
+          name: "Hemanth",
+          password: await bcrypt.hash(adminPassword, 10),
+          role: "super_admin",
+        },
+      });
+    } else {
+      // Sample articles need an author, so there is nothing else to seed.
+      console.warn(
+        "No staff accounts exist and SEED_ADMIN_PASSWORD is not set — nothing seeded. " +
+          "Set it and re-run `npm run db:seed` to create the first super admin."
+      );
+      return;
+    }
   }
 
   // 2. Sections

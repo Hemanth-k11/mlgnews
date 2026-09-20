@@ -34,7 +34,8 @@ Open:
 - Public site — http://localhost:3000
 - Admin — http://localhost:3000/admin  (you'll be sent to the login page)
 
-**Demo admin login:** `admin@example.com` / `admin1234`
+**Admin login:** `karlapati.hemanth@gmail.com` with the password you set as
+`SEED_ADMIN_PASSWORD` in `.env` before running the seed (used only on an empty database).
 
 > `npm run setup` runs `prisma migrate dev` the first time — run it in an interactive
 > terminal so it can create the migration. After that, `npm run dev` is all you need.

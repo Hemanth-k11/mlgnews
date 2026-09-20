@@ -139,7 +139,8 @@ git push -u origin main
   ```
 - **Make a real admin, drop the demo one:** `npm run db:studio` (with prod `DATABASE_URL`
   in `.env`) → `User` table → add yourself with a bcrypt hash, or log in as
-  `admin@example.com` / `admin1234` and change it, then delete the demo row.
+  `karlapati.hemanth@gmail.com` with your `SEED_ADMIN_PASSWORD` (set it as a Vercel
+  environment variable before the first deploy) and change it.
 - **Custom domain:** Vercel → Project → Settings → Domains → add yours and follow the DNS steps.
 
 ## Redeploying
