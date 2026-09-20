@@ -16,8 +16,10 @@ export async function middleware(request) {
   let signedIn = false;
   if (token) {
     try {
-      await jwtVerify(token, secret);
-      signedIn = true;
+      const { payload } = await jwtVerify(token, secret);
+      // Same rule as getSession(): only staff tokens (which have a role)
+      // count. A reader token has none and must not open /admin.
+      signedIn = Boolean(payload.role);
     } catch {
       signedIn = false;
     }

@@ -47,6 +47,9 @@ export async function getSession() {
   if (!token) return null;
   try {
     const { payload } = await jwtVerify(token, secret);
+    // Readers are signed with the same secret but carry no role — never
+    // accept one here, even if its cookie is copied over as "session".
+    if (!payload.role) return null;
     return {
       id: payload.sub,
       email: payload.email,
@@ -94,6 +97,8 @@ export async function getReaderSession() {
   if (!token) return null;
   try {
     const { payload } = await jwtVerify(token, secret);
+    // Staff tokens carry a role; they are not reader sessions.
+    if (payload.role) return null;
     return {
       id: payload.sub,
       email: payload.email,
