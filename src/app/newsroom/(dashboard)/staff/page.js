@@ -1,22 +1,30 @@
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
 import { adminListStaff } from "@/lib/queries";
-import { updateStaffRoleAction, deleteStaffAction } from "@/lib/actions";
+import { addStaffAction, updateStaffRoleAction, deleteStaffAction } from "@/lib/actions";
 import { formatDateTime } from "@/lib/format";
 import ConfirmButton from "@/components/ConfirmButton";
+import SubmitButton from "@/components/SubmitButton";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Staff" };
 
 export default async function AdminStaffPage({ searchParams }) {
   const session = await getSession();
-  if (session.role !== "super_admin") redirect("/admin?error=forbidden");
+  if (session.role !== "super_admin") redirect("/newsroom?error=forbidden");
 
   const staff = await adminListStaff();
 
   return (
     <div className="adm-main">
       {searchParams?.saved && <div className="notice notice--ok">Saved.</div>}
+      {searchParams?.added && (
+        <div className="notice notice--ok">
+          Staff account added for {searchParams.added}. They can sign in at /newsroom with the
+          password you set. Share it with them privately and ask them to change it on their
+          Profile page.
+        </div>
+      )}
       {searchParams?.deleted && <div className="notice notice--ok">Staff account deleted.</div>}
       {searchParams?.error && <div className="notice">{searchParams.error}</div>}
 
@@ -24,11 +32,41 @@ export default async function AdminStaffPage({ searchParams }) {
         <div>
           <h1 className="adm-h1">Staff</h1>
           <p className="hint">
-            Every account that can sign into /admin. Only a super admin can change roles or
-            remove accounts here.
+            Every account that can sign into /newsroom. Only a super admin can add people,
+            change roles or remove accounts here.
           </p>
         </div>
       </div>
+
+      <form
+        action={addStaffAction}
+        className="t-actions"
+        style={{ flexWrap: "wrap", gap: 8, marginBottom: 20 }}
+      >
+        <input name="name" type="text" placeholder="Full name" autoComplete="off" required />
+        <input name="email" type="email" placeholder="Email address" autoComplete="off" required />
+        <select name="role" defaultValue="editor" aria-label="Role">
+          <option value="super_admin">Super Admin</option>
+          <option value="admin">Admin</option>
+          <option value="editor">Editor</option>
+          <option value="author">Author</option>
+        </select>
+        <input
+          name="password"
+          type="password"
+          placeholder="Password (min 8 characters)"
+          autoComplete="new-password"
+          minLength={8}
+          required
+        />
+        <SubmitButton className="a-btn" pendingText="Adding…">
+          Add staff
+        </SubmitButton>
+      </form>
+      <p className="hint" style={{ marginTop: -10, marginBottom: 20 }}>
+        You set the password for a new staff member. They sign in at /newsroom with their email and
+        this password — share it with them privately.
+      </p>
 
       <div className="table-scroll">
         <table className="table">

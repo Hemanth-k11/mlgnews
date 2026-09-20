@@ -33,11 +33,9 @@ export default async function SiteFooter() {
             <a href="#">Careers</a>
           </div>
           <div>
-            <h4>Account</h4>
+            <h4>Explore</h4>
             <Link href="/epaper">e-Paper</Link>
-            <Link href="/login">Sign In</Link>
-            <Link href="/signup">Sign Up</Link>
-            <Link href="/admin">Admin panel</Link>
+            <Link href="/newsroom">Admin panel</Link>
             <a href="#">Newsletters</a>
           </div>
         </div>

@@ -1,3 +1,5 @@
+import { redirect } from "next/navigation";
+import { getSession } from "@/lib/auth";
 import { adminListAds } from "@/lib/queries";
 import {
   setAdImageAction,
@@ -16,6 +18,9 @@ const LABELS = {
 };
 
 export default async function AdsPage({ searchParams }) {
+  const session = await getSession();
+  if (session?.role !== "super_admin") redirect("/newsroom?error=forbidden");
+
   const ads = await adminListAds();
 
   return (

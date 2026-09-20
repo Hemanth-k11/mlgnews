@@ -298,7 +298,7 @@ async function main() {
     });
   }
 
-  // 5. Ad slots (one banner per placement, managed at /admin/ads)
+  // 5. Ad slots (one banner per placement, managed at /newsroom/ads)
   const AD_SLOTS = [
     { placement: "home-rail", name: "House ad — homepage", w: 600, h: 500 },
     { placement: "article-rail", name: "House ad — article", w: 600, h: 1200 },

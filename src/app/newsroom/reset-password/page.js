@@ -1,11 +1,11 @@
 import Link from "next/link";
 import { prisma } from "@/lib/db";
-import ResetPasswordForm from "@/components/ResetPasswordForm";
+import StaffResetPasswordForm from "@/components/StaffResetPasswordForm";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Set a new password" };
 
-export default async function ResetPasswordPage({ searchParams }) {
+export default async function AdminResetPasswordPage({ searchParams }) {
   const token = searchParams?.token || "";
 
   const record = token
@@ -17,19 +17,19 @@ export default async function ResetPasswordPage({ searchParams }) {
     <div className="login-page">
       <div className="login-card">
         <div className="wordmark">Miryalaguda Chronicle</div>
-        <div className="sub">Set a new password</div>
+        <div className="sub">Newsroom Admin — set a new password</div>
 
         {valid ? (
-          <ResetPasswordForm token={token} />
+          <StaffResetPasswordForm token={token} />
         ) : (
           <p className="hint">
             This reset link is invalid or has expired.{" "}
-            <Link href="/forgot-password">Request a new one</Link>.
+            <Link href="/newsroom/forgot-password">Request a new one</Link>.
           </p>
         )}
 
         <p className="demo">
-          <Link href="/login">&larr; Back to sign in</Link>
+          <Link href="/newsroom/login">&larr; Back to sign in</Link>
         </p>
       </div>
     </div>

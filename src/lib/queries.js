@@ -82,30 +82,16 @@ export async function getArticleBySlug(slug) {
   });
 }
 
-export async function getReaderLikedArticles(readerId) {
-  const likes = await prisma.like.findMany({
-    where: { readerId },
-    orderBy: { createdAt: "desc" },
-    include: { article: { include: { category: true } } },
-  });
-  return likes.map((l) => l.article);
-}
-
-export async function getArticleEngagement(articleId, readerId) {
-  const [likeCount, liked, comments] = await Promise.all([
+export async function getArticleEngagement(articleId, visitorId) {
+  const [likeCount, liked] = await Promise.all([
     prisma.like.count({ where: { articleId } }),
-    readerId
+    visitorId
       ? prisma.like
-          .findUnique({ where: { articleId_readerId: { articleId, readerId } } })
+          .findUnique({ where: { articleId_visitorId: { articleId, visitorId } } })
           .then(Boolean)
       : Promise.resolve(false),
-    prisma.comment.findMany({
-      where: { articleId },
-      orderBy: { createdAt: "desc" },
-      include: { reader: { select: { name: true } } },
-    }),
   ]);
-  return { likeCount, liked, comments };
+  return { likeCount, liked };
 }
 
 export async function getRelated(article, take = 3) {
@@ -172,14 +158,6 @@ export async function adminGetArticle(id) {
   return prisma.article.findUnique({
     where: { id },
     include: { category: true, images: { orderBy: { order: "asc" } } },
-  });
-}
-
-export async function adminListAdminRequests() {
-  return prisma.reader.findMany({
-    where: { adminRequestStatus: "pending" },
-    orderBy: { createdAt: "asc" },
-    select: { id: true, name: true, email: true, adminRequestNote: true, createdAt: true },
   });
 }
 

@@ -119,6 +119,11 @@ git push -u origin main
    | `AUTH_SECRET` | a fresh 64-char random string (see below) |
    | `CLOUDINARY_CLOUD_NAME` | your Cloudinary cloud name |
    | `CLOUDINARY_UPLOAD_PRESET` | your unsigned preset name |
+   | `SMTP_USER` | the Gmail address that sends password-reset emails |
+   | `SMTP_PASS` | a Google **app password** for that address (Google Account → Security → App passwords; needs 2-Step Verification) |
+   | `SEED_ADMIN_PASSWORD` | password for the first super admin (only used on an empty database) |
+
+   Without `SMTP_USER` / `SMTP_PASS`, "Forgot password" refuses to run and says so.
 
    Generate a secret:
    ```bash
@@ -126,7 +131,7 @@ git push -u origin main
    ```
 
 4. Click **Deploy**. First build runs the migration against Neon automatically.
-5. Open the `*.vercel.app` URL. Public site should load; `/admin` should redirect to login.
+5. Open the `*.vercel.app` URL. Public site should load; `/newsroom` should redirect to login.
 
 ---
 

@@ -47,62 +47,13 @@ export async function getSession() {
   if (!token) return null;
   try {
     const { payload } = await jwtVerify(token, secret);
-    // Readers are signed with the same secret but carry no role — never
-    // accept one here, even if its cookie is copied over as "session".
+    // Every staff token carries a role; treat anything without one as signed out.
     if (!payload.role) return null;
     return {
       id: payload.sub,
       email: payload.email,
       name: payload.name,
       role: payload.role,
-    };
-  } catch {
-    return null;
-  }
-}
-
-// ---------- Reader sessions ----------
-// A separate cookie from the admin session above, so a reader signed in on
-// the public site and a staff member signed in on /admin don't collide.
-
-const READER_COOKIE_NAME = "reader_session";
-
-export async function createReaderSession(reader) {
-  const token = await new SignJWT({
-    email: reader.email,
-    name: reader.name,
-  })
-    .setProtectedHeader({ alg: "HS256" })
-    .setSubject(reader.id)
-    .setIssuedAt()
-    .setExpirationTime("30d")
-    .sign(secret);
-
-  cookies().set(READER_COOKIE_NAME, token, {
-    httpOnly: true,
-    sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
-    path: "/",
-    maxAge: 60 * 60 * 24 * 30,
-  });
-}
-
-export function destroyReaderSession() {
-  cookies().delete(READER_COOKIE_NAME);
-}
-
-// Returns { id, email, name } or null.
-export async function getReaderSession() {
-  const token = cookies().get(READER_COOKIE_NAME)?.value;
-  if (!token) return null;
-  try {
-    const { payload } = await jwtVerify(token, secret);
-    // Staff tokens carry a role; they are not reader sessions.
-    if (payload.role) return null;
-    return {
-      id: payload.sub,
-      email: payload.email,
-      name: payload.name,
     };
   } catch {
     return null;

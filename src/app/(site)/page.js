@@ -28,7 +28,7 @@ export default async function HomePage() {
         <div className="empty">
           <b>No stories yet</b>
           Publish an article from the{" "}
-          <Link href="/admin">admin panel</Link> and it will appear here.
+          <Link href="/newsroom">admin panel</Link> and it will appear here.
         </div>
       </div>
     );

@@ -9,7 +9,7 @@ export default function LoginForm({ next }) {
 
   return (
     <form action={formAction}>
-      <input type="hidden" name="next" value={next || "/admin"} />
+      <input type="hidden" name="next" value={next || "/newsroom"} />
 
       <label htmlFor="email">Email</label>
       <input id="email" name="email" type="email" autoComplete="username" required />

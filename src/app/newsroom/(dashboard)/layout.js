@@ -2,7 +2,6 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
 import { logoutAction } from "@/lib/actions";
-import { adminListAdminRequests } from "@/lib/queries";
 
 export const dynamic = "force-dynamic";
 
@@ -12,34 +11,30 @@ export const metadata = {
 
 export default async function DashboardLayout({ children }) {
   const session = await getSession();
-  if (!session) redirect("/admin/login");
+  if (!session) redirect("/newsroom/login");
 
   const isSuperAdmin = session.role === "super_admin";
-  const pendingRequests = isSuperAdmin ? await adminListAdminRequests() : [];
 
   return (
     <div className="adm">
       <div className="app-bar">
-        <Link href="/admin" className="brand">
+        <Link href="/newsroom" className="brand">
           Miryalaguda Chronicle
         </Link>
-        <Link href="/admin">Articles</Link>
-        <Link href="/admin/editions">Editions</Link>
-        <Link href="/admin/ads">Ads</Link>
+        <Link href="/newsroom">Articles</Link>
+        <Link href="/newsroom/editions">Editions</Link>
         {isSuperAdmin && (
           <>
-            <Link href="/admin/requests">
-              Requests{pendingRequests.length > 0 ? ` (${pendingRequests.length})` : ""}
-            </Link>
-            <Link href="/admin/staff">Staff</Link>
+            <Link href="/newsroom/ads">Ads</Link>
+            <Link href="/newsroom/staff">Staff</Link>
           </>
         )}
-        <Link href="/admin/profile">Profile</Link>
+        <Link href="/newsroom/profile">Profile</Link>
         <Link href="/" target="_blank">
           View site &#8599;
         </Link>
         <span className="spacer" />
-        <Link href="/admin/profile" className="who">
+        <Link href="/newsroom/profile" className="who">
           {session.email}
         </Link>
         <form action={logoutAction}>

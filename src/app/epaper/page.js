@@ -21,7 +21,7 @@ export default async function EpaperIndex() {
         <div className="empty">
           <b>No edition published yet</b>
           Build one in the{" "}
-          <Link href="/admin/editions">admin panel</Link>, mark it Published, and it
+          <Link href="/newsroom/editions">admin panel</Link>, mark it Published, and it
           will open here.
         </div>
       </div>

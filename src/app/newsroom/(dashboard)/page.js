@@ -38,7 +38,7 @@ export default async function AdminArticlesPage({ searchParams }) {
         </form>
       </div>
 
-      <form className="filters" action="/admin">
+      <form className="filters" action="/newsroom">
         <input
           type="text"
           name="q"
@@ -85,7 +85,7 @@ export default async function AdminArticlesPage({ searchParams }) {
             {articles.map((a) => (
               <tr key={a.id}>
                 <td className="t-title">
-                  <Link href={`/admin/articles/${a.id}/edit`}>{a.title}</Link>
+                  <Link href={`/newsroom/articles/${a.id}/edit`}>{a.title}</Link>
                 </td>
                 <td>
                   <span className={`pill pill--${a.status}`}>{a.status}</span>
@@ -94,7 +94,7 @@ export default async function AdminArticlesPage({ searchParams }) {
                 <td>{formatDate(a.updatedAt)}</td>
                 <td>
                   <div className="t-actions">
-                    <Link className="a-btn" href={`/admin/articles/${a.id}/edit`}>
+                    <Link className="a-btn" href={`/newsroom/articles/${a.id}/edit`}>
                       Edit
                     </Link>
                     <form action={deleteArticleAction}>

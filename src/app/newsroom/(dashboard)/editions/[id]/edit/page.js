@@ -34,7 +34,7 @@ export default async function EditEditionPage({ params }) {
           </p>
         </div>
         <div className="t-actions">
-          <Link className="a-btn" href="/admin/editions">
+          <Link className="a-btn" href="/newsroom/editions">
             All editions
           </Link>
           {edition.status === "published" && (

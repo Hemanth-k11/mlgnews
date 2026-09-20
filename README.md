@@ -5,7 +5,7 @@ A working news site built from the approved mockups:
 - **Public site** (server-rendered for SEO): homepage, section pages, article pages, search.
 - **e-Paper** at `/epaper`: a dated digital edition laid out as broadsheet pages you can
   flip through and Print / Save as PDF (a real print stylesheet is included).
-- **Admin panel** at `/admin`: cookie-session login, article list with filters, a create/edit
+- **Admin panel** at `/newsroom`: cookie-session login, article list with filters, a create/edit
   editor with Markdown, draft/publish status, categories, tags; an **Images** panel to
   **upload** the main image (or paste a URL) and attach a **gallery** of extra pictures;
   an **Editions** area to compile the e-Paper; and an **Ads** area to upload/manage the
@@ -75,7 +75,7 @@ src/
 │   ├── auth.js                password hashing + signed session cookie
 │   ├── queries.js             all database reads
 │   └── actions.js             server actions: login, logout, save/delete article
-└── middleware.js              (in src/) blocks /admin for signed-out visitors
+└── middleware.js              (in src/) blocks /newsroom for signed-out visitors
 prisma/
 ├── schema.prisma             User, Category, Article
 └── seed.mjs                  demo data
@@ -83,8 +83,15 @@ prisma/
 
 **Auth model:** on login, the server checks the bcrypt password hash, then sets an
 httpOnly cookie holding a signed JWT (`jose`). `middleware.js` verifies it on every
-`/admin` request; the dashboard layout checks it again. Authorisation is enforced on
+`/newsroom` request; the dashboard layout checks it again. Authorisation is enforced on
 the server in every action — never just by hiding a button.
+
+There are no public reader accounts — only staff sign in (at `/newsroom`). A super admin
+adds staff at `/newsroom/staff` and sets each person's password (required, at least 8
+characters) — no email needed, they sign in with it and can change it on their Profile page —
+and "Forgot your password?" on the admin sign-in page emails a reset link, which needs
+`SMTP_USER` / `SMTP_PASS` (see `.env.example`). Readers can like a story without an
+account — one like per browser, remembered with a cookie.
 
 **Content model:** an `Article` has a title, slug, summary, Markdown body, hero image
 URL + alt text + caption, a `status` (`draft` / `published`), a `featured` flag (the one
@@ -118,7 +125,7 @@ as PDF produces a clean paper.
 ## Advertisements
 
 Three placements — `home-rail`, `article-rail`, `section-rail` — each an `Ad` row.
-Manage them at **`/admin/ads`**: upload a banner (or paste a URL), set a click-through
+Manage them at **`/newsroom/ads`**: upload a banner (or paste a URL), set a click-through
 link and alt text, and toggle `active`. `<AdSlot placement="…">` renders the live banner
 (linked, `rel="sponsored"`) when one is set and active, otherwise the grey placeholder box.
 

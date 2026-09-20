@@ -1,11 +1,11 @@
 "use client";
 
 import { useFormState } from "react-dom";
-import { requestPasswordResetAction } from "@/lib/actions";
+import { requestStaffPasswordResetAction } from "@/lib/actions";
 import SubmitButton from "./SubmitButton";
 
-export default function ForgotPasswordForm() {
-  const [state, formAction] = useFormState(requestPasswordResetAction, {});
+export default function StaffForgotPasswordForm() {
+  const [state, formAction] = useFormState(requestStaffPasswordResetAction, {});
 
   if (state?.ok) {
     return <p className="hint">{state.ok}</p>;

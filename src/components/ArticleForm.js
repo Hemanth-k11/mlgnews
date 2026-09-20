@@ -82,7 +82,7 @@ export default function ArticleForm({ article, categories }) {
         {state?.error && <div className="form-error">{state.error}</div>}
 
         <div className="adm-toprow" style={{ marginBottom: 0 }}>
-          <a className="a-btn" href="/admin">
+          <a className="a-btn" href="/newsroom">
             Cancel
           </a>
           <SubmitButton pendingText="Saving…">

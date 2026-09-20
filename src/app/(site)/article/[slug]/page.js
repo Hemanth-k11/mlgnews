@@ -6,7 +6,6 @@ import Placeholder from "@/components/Placeholder";
 import { RankModule, AdSlot } from "@/components/RailBits";
 import LikeButton from "@/components/LikeButton";
 import ShareBar from "@/components/ShareBar";
-import CommentForm from "@/components/CommentForm";
 import {
   getArticleBySlug,
   getRelated,
@@ -14,8 +13,8 @@ import {
   incrementViews,
   getArticleEngagement,
 } from "@/lib/queries";
-import { getReaderSession } from "@/lib/auth";
-import { formatDateTime, timeAgo, splitTags } from "@/lib/format";
+import { getVisitorId } from "@/lib/visitor";
+import { formatDateTime, splitTags } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
 
@@ -41,12 +40,10 @@ export default async function ArticlePage({ params }) {
   // best-effort view count for "Most Read"
   await incrementViews(article.id);
 
-  const reader = await getReaderSession();
-
   const [related, mostRead, engagement] = await Promise.all([
     getRelated(article, 3),
     getMostRead(5),
-    getArticleEngagement(article.id, reader?.id),
+    getArticleEngagement(article.id, getVisitorId()),
   ]);
 
   const tags = splitTags(article.tags);
@@ -134,39 +131,6 @@ export default async function ArticlePage({ params }) {
                 </div>
               </section>
             )}
-
-            <section>
-              <h2 className="section-title">
-                Comments{engagement.comments.length > 0 ? ` (${engagement.comments.length})` : ""}
-              </h2>
-
-              {reader ? (
-                <CommentForm articleId={article.id} slug={article.slug} />
-              ) : (
-                <div className="cbox">
-                  <p className="hint">
-                    <Link href={`/login?next=${encodeURIComponent(`/article/${article.slug}`)}`}>
-                      Sign in
-                    </Link>{" "}
-                    to join the discussion.
-                  </p>
-                </div>
-              )}
-
-              {engagement.comments.length > 0 && (
-                <div className="c-list">
-                  {engagement.comments.map((c) => (
-                    <div key={c.id} className="c-item">
-                      <div className="c-item__head">
-                        <b>{c.reader.name}</b>
-                        <span>{timeAgo(c.createdAt)}</span>
-                      </div>
-                      <p>{c.body}</p>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </section>
           </div>
         </article>
 

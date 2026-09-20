@@ -28,37 +28,12 @@ model User {
   address     String    @default("")
   bio         String    @default("")
   profession  String    @default("")
-}
 
-// A public reader account (sign up / sign in on the site). Separate from
-// User, which is staff (admin/editor/author) and can access /admin.
-model Reader {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  name      String
-  password  String // bcrypt hash, never plain text
-  createdAt DateTime @default(now())
-
-  // Set at sign up if the reader checks "request admin/staff access".
-  // Reviewed by an existing admin on /admin/requests.
-  adminRequestStatus String @default("none") // "none" | "pending" | "approved" | "rejected"
-  adminRequestNote   String @default("") // optional message from the reader
-
-  // Profile
-  username    String?   @unique
-  avatarUrl   String?
-  dateOfBirth DateTime?
-  city        String    @default("")
-  address     String    @default("")
-  bio         String    @default("")
-  profession  String    @default("")
-
-  likes       Like[]
-  comments    Comment[]
   resetTokens PasswordResetToken[]
 }
 
-// A one-time link emailed to a reader so they can set a new password.
+// A one-time link emailed to a staff member so they can set (or reset) their
+// password. Used by "Forgot password".
 model PasswordResetToken {
   id        String    @id @default(cuid())
   token     String    @unique
@@ -66,38 +41,24 @@ model PasswordResetToken {
   usedAt    DateTime?
   createdAt DateTime  @default(now())
 
-  readerId String
-  reader   Reader @relation(fields: [readerId], references: [id], onDelete: Cascade)
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@index([readerId])
+  @@index([userId])
 }
 
-// One reader's like on one article.
+// One like on one article from one browser. There are no reader accounts, so a
+// visitor is identified by a random id kept in a cookie (visitorId).
 model Like {
   id        String   @id @default(cuid())
   createdAt DateTime @default(now())
 
   articleId String
-  article   Article @relation(fields: [articleId], references: [id], onDelete: Cascade)
-  readerId  String
-  reader    Reader  @relation(fields: [readerId], references: [id], onDelete: Cascade)
+  article   Article  @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  visitorId String   @map("readerId")
 
-  @@unique([articleId, readerId])
+  @@unique([articleId, visitorId])
   @@index([articleId])
-}
-
-// A reader's comment on an article.
-model Comment {
-  id        String   @id @default(cuid())
-  body      String
-  createdAt DateTime @default(now())
-
-  articleId String
-  article   Article @relation(fields: [articleId], references: [id], onDelete: Cascade)
-  readerId  String
-  reader    Reader  @relation(fields: [readerId], references: [id], onDelete: Cascade)
-
-  @@index([articleId, createdAt])
 }
 
 model Category {
@@ -134,7 +95,6 @@ model Article {
   editionItems EditionItem[]
   images       ArticleImage[]
   likes        Like[]
-  comments     Comment[]
 
   @@index([status, publishedAt])
   @@index([categoryId])
@@ -170,7 +130,7 @@ model Edition {
   items EditionItem[]
 }
 
-// A banner advertisement for one placement on the site. Managed from /admin/ads.
+// A banner advertisement for one placement on the site. Managed from /newsroom/ads.
 model Ad {
   id        String   @id @default(cuid())
   placement String   @unique // "home-rail" | "article-rail" | "section-rail"

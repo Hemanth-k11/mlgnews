@@ -1,11 +1,11 @@
 "use client";
 
 import { useFormState } from "react-dom";
-import { resetPasswordAction } from "@/lib/actions";
+import { resetStaffPasswordAction } from "@/lib/actions";
 import SubmitButton from "./SubmitButton";
 
-export default function ResetPasswordForm({ token }) {
-  const [state, formAction] = useFormState(resetPasswordAction, {});
+export default function StaffResetPasswordForm({ token }) {
+  const [state, formAction] = useFormState(resetStaffPasswordAction, {});
 
   return (
     <form action={formAction}>

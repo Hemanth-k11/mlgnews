@@ -884,62 +884,6 @@ img {
 .rel-grid .hl {
   font-size: 0.92rem;
 }
-.cbox {
-  border: 1px solid var(--rule);
-  background: var(--wash);
-  padding: 14px;
-}
-.cbox .fld {
-  background: var(--paper);
-  border: 1px solid var(--rule-strong);
-  height: 38px;
-  display: flex;
-  align-items: center;
-  padding: 0 10px;
-  font-size: 0.74rem;
-  color: var(--muted);
-}
-.cbox .c-fld {
-  width: 100%;
-  background: var(--paper);
-  border: 1px solid var(--rule-strong);
-  padding: 10px;
-  font: inherit;
-  font-size: 0.82rem;
-  color: var(--ink);
-  resize: vertical;
-  margin-bottom: 10px;
-}
-.c-list {
-  margin-top: 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-}
-.c-item {
-  border-top: 1px solid var(--rule);
-  padding-top: 12px;
-}
-.c-item__head {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-  margin-bottom: 4px;
-}
-.c-item__head b {
-  font-size: 0.8rem;
-}
-.c-item__head span {
-  font-size: 0.68rem;
-  color: var(--muted);
-}
-.c-item p {
-  font-size: 0.85rem;
-  color: var(--body);
-  line-height: 1.6;
-  white-space: pre-wrap;
-}
-
 /* ---------- Section / search pages ---------- */
 .sec-head {
   padding: 20px 0 0;

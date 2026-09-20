@@ -3,19 +3,11 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import crypto from "crypto";
-import { headers } from "next/headers";
+import { headers, cookies } from "next/headers";
 import { prisma } from "./db";
-import { sendWelcomeEmail, sendAdminSignupNotification, sendPasswordResetEmail } from "./email";
-import {
-  getSession,
-  createSession,
-  destroySession,
-  verifyPassword,
-  hashPassword,
-  getReaderSession,
-  createReaderSession,
-  destroyReaderSession,
-} from "./auth";
+import { assertEmailReady, sendPasswordResetEmail } from "./email";
+import { getSession, createSession, destroySession, verifyPassword, hashPassword } from "./auth";
+import { VISITOR_COOKIE, getVisitorId } from "./visitor";
 import { slugify, dayStartUTC, parseISODate, toISODate } from "./format";
 import { saveUpload, deleteUpload } from "./upload";
 
@@ -26,7 +18,7 @@ const AVATAR_MAX_BYTES = 800 * 1024; // 800 KB, per user
 export async function loginAction(_prevState, formData) {
   const email = String(formData.get("email") || "").toLowerCase().trim();
   const password = String(formData.get("password") || "");
-  const next = String(formData.get("next") || "/admin");
+  const next = String(formData.get("next") || "/newsroom");
 
   if (!email || !password) {
     return { error: "Enter your email and password." };
@@ -40,133 +32,12 @@ export async function loginAction(_prevState, formData) {
   }
 
   await createSession(user);
-  redirect(next.startsWith("/admin") ? next : "/admin");
+  redirect(next.startsWith("/newsroom") ? next : "/newsroom");
 }
 
 export async function logoutAction() {
   destroySession();
-  redirect("/admin/login");
-}
-
-// ---------- Reader accounts (public sign up / sign in) ----------
-
-function safeNext(next, fallback) {
-  // Only ever redirect within the site — never to an external URL.
-  return next && next.startsWith("/") ? next : fallback;
-}
-
-export async function readerSignupAction(_prevState, formData) {
-  const name = String(formData.get("name") || "").trim();
-  const email = String(formData.get("email") || "").toLowerCase().trim();
-  const password = String(formData.get("password") || "");
-  const requestAdmin = formData.get("requestAdmin") === "on";
-  const adminRequestNote = String(formData.get("adminRequestNote") || "").trim().slice(0, 500);
-  const next = safeNext(String(formData.get("next") || ""), "/account");
-
-  if (!name || !email || !password) {
-    return { error: "Fill in your name, email and password." };
-  }
-  if (password.length < 8) {
-    return { error: "Password must be at least 8 characters." };
-  }
-
-  const existing = await prisma.reader.findUnique({ where: { email } });
-  if (existing) {
-    return { error: "An account with that email already exists. Try signing in instead." };
-  }
-
-  const reader = await prisma.reader.create({
-    data: {
-      name,
-      email,
-      password: await hashPassword(password),
-      adminRequestStatus: requestAdmin ? "pending" : "none",
-      adminRequestNote: requestAdmin ? adminRequestNote : "",
-    },
-  });
-
-  try {
-    await sendWelcomeEmail(reader.email, reader.name);
-  } catch (e) {
-    console.error("Failed to send welcome email:", e);
-  }
-
-  try {
-    const admins = await prisma.user.findMany({
-      where: { role: "admin" },
-      select: { email: true },
-    });
-    await sendAdminSignupNotification(admins.map((a) => a.email), reader);
-  } catch (e) {
-    console.error("Failed to send admin signup notification:", e);
-  }
-
-  await createReaderSession(reader);
-  redirect(next);
-}
-
-export async function readerLoginAction(_prevState, formData) {
-  const email = String(formData.get("email") || "").toLowerCase().trim();
-  const password = String(formData.get("password") || "");
-  const next = safeNext(String(formData.get("next") || ""), "/account");
-
-  if (!email || !password) {
-    return { error: "Enter your email and password." };
-  }
-
-  const reader = await prisma.reader.findUnique({ where: { email } });
-  const ok = reader && (await verifyPassword(password, reader.password));
-  if (!ok) {
-    // One generic message — don't reveal which field was wrong.
-    return { error: "Email or password is incorrect." };
-  }
-
-  await createReaderSession(reader);
-  redirect(next);
-}
-
-export async function readerLogoutAction() {
-  destroyReaderSession();
-  redirect("/");
-}
-
-// A signed-in staff member approves a reader's request for /admin access —
-// this creates their staff (User) account, reusing the password they
-// already set as a reader so they can sign in with it right away.
-export async function approveAdminRequestAction(formData) {
-  await requireSuperAdmin();
-  const readerId = String(formData.get("readerId") || "");
-  const reader = await prisma.reader.findUnique({ where: { id: readerId } });
-
-  if (reader && reader.adminRequestStatus === "pending") {
-    const clash = await prisma.user.findUnique({ where: { email: reader.email } });
-    if (!clash) {
-      await prisma.user.create({
-        data: {
-          email: reader.email,
-          name: reader.name,
-          password: reader.password,
-          role: "editor",
-        },
-      });
-    }
-    await prisma.reader.update({
-      where: { id: readerId },
-      data: { adminRequestStatus: "approved" },
-    });
-  }
-  revalidatePath("/admin/requests");
-  redirect("/admin/requests?approved=1");
-}
-
-export async function rejectAdminRequestAction(formData) {
-  await requireSuperAdmin();
-  const readerId = String(formData.get("readerId") || "");
-  await prisma.reader
-    .update({ where: { id: readerId }, data: { adminRequestStatus: "rejected" } })
-    .catch(() => {});
-  revalidatePath("/admin/requests");
-  redirect("/admin/requests?rejected=1");
+  redirect("/newsroom/login");
 }
 
 function baseUrl() {
@@ -175,28 +46,46 @@ function baseUrl() {
   return `${proto}://${host}`;
 }
 
-export async function requestPasswordResetAction(_prevState, formData) {
+const RESET_LINK_MS = 60 * 60 * 1000; // "Forgot password" links last 1 hour
+
+// ---------- Staff password reset (/newsroom/forgot-password) ----------
+// A one-time emailed link that sets a new password. The reset mail is mandatory:
+// if email can't be sent we say so instead of pretending it went out.
+
+export async function requestStaffPasswordResetAction(_prevState, formData) {
   const email = String(formData.get("email") || "").toLowerCase().trim();
-  // Same message whether or not the account exists — don't reveal who has one.
-  const ok = { ok: "If an account exists for that email, we've sent a reset link." };
   if (!email) return { error: "Enter your email." };
 
-  const reader = await prisma.reader.findUnique({ where: { email } });
-  if (reader) {
+  // Check mail delivery works BEFORE looking the account up, so a mail problem is
+  // reported the same way for every address (no account enumeration).
+  try {
+    await assertEmailReady();
+  } catch (e) {
+    console.error("Password reset unavailable - email is not working:", e);
+    return { error: "We can't send email right now. Please try again later or contact the site owner." };
+  }
+
+  // Same message whether or not the account exists — don't reveal who has one.
+  const ok = { ok: "If a staff account exists for that email, we've sent a reset link." };
+
+  const user = await prisma.user.findUnique({ where: { email } });
+  if (user) {
     const token = crypto.randomBytes(32).toString("hex");
     await prisma.passwordResetToken.create({
-      data: { token, readerId: reader.id, expiresAt: new Date(Date.now() + 60 * 60 * 1000) },
+      data: { token, userId: user.id, expiresAt: new Date(Date.now() + RESET_LINK_MS) },
     });
     try {
-      await sendPasswordResetEmail(reader.email, `${baseUrl()}/reset-password?token=${token}`);
+      await sendPasswordResetEmail(user.email, `${baseUrl()}/newsroom/reset-password?token=${token}`);
     } catch (e) {
-      console.error("Failed to send password reset email:", e);
+      console.error("Failed to send staff password reset email:", e);
+      await prisma.passwordResetToken.delete({ where: { token } }).catch(() => {});
+      return { error: "We couldn't send the reset email. Please try again in a few minutes." };
     }
   }
   return ok;
 }
 
-export async function resetPasswordAction(_prevState, formData) {
+export async function resetStaffPasswordAction(_prevState, formData) {
   const token = String(formData.get("token") || "");
   const password = String(formData.get("password") || "");
   const confirm = String(formData.get("confirm") || "");
@@ -207,11 +96,11 @@ export async function resetPasswordAction(_prevState, formData) {
 
   const record = await prisma.passwordResetToken.findUnique({ where: { token } });
   if (!record || record.usedAt || record.expiresAt < new Date()) {
-    return { error: "This reset link is invalid or has expired. Request a new one." };
+    return { error: "This link is invalid or has expired. Request a new one." };
   }
 
-  const reader = await prisma.reader.update({
-    where: { id: record.readerId },
+  await prisma.user.update({
+    where: { id: record.userId },
     data: { password: await hashPassword(password) },
   });
   await prisma.passwordResetToken.update({
@@ -219,165 +108,111 @@ export async function resetPasswordAction(_prevState, formData) {
     data: { usedAt: new Date() },
   });
 
-  await createReaderSession(reader);
-  redirect("/account?reset=1");
+  // Don't sign them in automatically — make them use the new password once.
+  redirect("/newsroom/login?reset=1");
 }
 
-async function requireReaderSession(next) {
-  const session = await getReaderSession();
-  if (!session) redirect(`/login?next=${encodeURIComponent(next)}`);
-  return session;
-}
-
-// ---------- Likes & comments (readers) ----------
+// ---------- Likes (no account needed) ----------
+// One like per browser per article. A random id in a cookie stands in for a
+// signed-in reader; clicking again removes the like.
 
 export async function toggleLikeAction(formData) {
   const articleId = String(formData.get("articleId") || "");
   const slug = String(formData.get("slug") || "");
-  const session = await requireReaderSession(`/article/${slug}`);
+
+  const article = await prisma.article.findUnique({ where: { id: articleId }, select: { id: true } });
+  if (!article) redirect("/");
+
+  let visitorId = getVisitorId();
+  if (!visitorId) {
+    visitorId = crypto.randomUUID();
+    cookies().set(VISITOR_COOKIE, visitorId, {
+      httpOnly: true,
+      sameSite: "lax",
+      secure: process.env.NODE_ENV === "production",
+      path: "/",
+      maxAge: 60 * 60 * 24 * 365,
+    });
+  }
 
   const existing = await prisma.like.findUnique({
-    where: { articleId_readerId: { articleId, readerId: session.id } },
+    where: { articleId_visitorId: { articleId, visitorId } },
   });
   if (existing) {
     await prisma.like.delete({ where: { id: existing.id } });
   } else {
-    await prisma.like.create({ data: { articleId, readerId: session.id } });
+    await prisma.like.create({ data: { articleId, visitorId } });
   }
   revalidatePath(`/article/${slug}`);
   redirect(`/article/${slug}`);
 }
 
-export async function addCommentAction(_prevState, formData) {
-  const articleId = String(formData.get("articleId") || "");
-  const slug = String(formData.get("slug") || "");
-  const session = await requireReaderSession(`/article/${slug}`);
-
-  const body = String(formData.get("body") || "").trim();
-  if (!body) return { error: "Write something before posting." };
-  if (body.length > 2000) return { error: "Comments are limited to 2000 characters." };
-
-  await prisma.comment.create({ data: { articleId, readerId: session.id, body } });
-  revalidatePath(`/article/${slug}`);
-  return { ok: true };
-}
-
-// ---------- Reader profile ----------
-
 const USERNAME_RE = /^[a-z0-9_]{3,20}$/;
-
-export async function updateReaderProfileAction(_prevState, formData) {
-  const session = await requireReaderSession("/account");
-
-  const name = String(formData.get("name") || "").trim();
-  const username = String(formData.get("username") || "").trim().toLowerCase();
-  const dobRaw = String(formData.get("dateOfBirth") || "");
-  const city = String(formData.get("city") || "").trim();
-  const address = String(formData.get("address") || "").trim();
-  const bio = String(formData.get("bio") || "").trim().slice(0, 1000);
-  const profession = String(formData.get("profession") || "").trim();
-
-  if (!name) return { error: "Name is required." };
-  if (username && !USERNAME_RE.test(username)) {
-    return { error: "Username must be 3-20 characters: lowercase letters, numbers, underscores." };
-  }
-  if (username) {
-    const clash = await prisma.reader.findFirst({
-      where: { username, NOT: { id: session.id } },
-      select: { id: true },
-    });
-    if (clash) return { error: "That username is already taken." };
-  }
-
-  let dateOfBirth = null;
-  if (dobRaw) {
-    dateOfBirth = new Date(dobRaw);
-    if (Number.isNaN(dateOfBirth.getTime())) return { error: "Enter a valid date of birth." };
-  }
-
-  await prisma.reader.update({
-    where: { id: session.id },
-    data: { name, username: username || null, dateOfBirth, city, address, bio, profession },
-  });
-
-  revalidatePath("/account");
-  return { ok: "Profile saved." };
-}
-
-export async function updateReaderAvatarAction(formData) {
-  const session = await requireReaderSession("/account");
-  const result = await saveUpload(formData.get("file"), AVATAR_MAX_BYTES);
-  if (result.url) {
-    const prev = await prisma.reader.findUnique({
-      where: { id: session.id },
-      select: { avatarUrl: true },
-    });
-    await prisma.reader.update({ where: { id: session.id }, data: { avatarUrl: result.url } });
-    if (prev?.avatarUrl && prev.avatarUrl !== result.url) await deleteUpload(prev.avatarUrl);
-  }
-  revalidatePath("/account");
-  redirect(`/account${result.error ? `?imgerror=${encodeURIComponent(result.error)}` : ""}`);
-}
-
-export async function changeReaderPasswordAction(_prevState, formData) {
-  const session = await requireReaderSession("/account");
-
-  const currentPassword = String(formData.get("currentPassword") || "");
-  const newPassword = String(formData.get("newPassword") || "");
-  const confirm = String(formData.get("confirm") || "");
-
-  if (!currentPassword || !newPassword) return { error: "Fill in both password fields." };
-  if (newPassword.length < 8) return { error: "New password must be at least 8 characters." };
-  if (newPassword !== confirm) return { error: "New passwords don't match." };
-
-  const reader = await prisma.reader.findUnique({ where: { id: session.id } });
-  const ok = reader && (await verifyPassword(currentPassword, reader.password));
-  if (!ok) return { error: "Current password is incorrect." };
-
-  await prisma.reader.update({
-    where: { id: session.id },
-    data: { password: await hashPassword(newPassword) },
-  });
-  return { ok: "Password changed." };
-}
 
 // ---------- Articles ----------
 
 async function requireSession() {
   const session = await getSession();
-  if (!session) redirect("/admin/login");
+  if (!session) redirect("/newsroom/login");
   return session;
 }
 
-// Only "super_admin" can approve access requests or manage other staff
-// accounts. Every other staff role keeps today's access (articles,
-// editions, ads, their own profile).
+// Only "super_admin" can manage staff accounts and advertisements. Every other
+// staff role keeps access to articles, editions and their own profile.
 async function requireSuperAdmin() {
   const session = await requireSession();
-  if (session.role !== "super_admin") redirect("/admin?error=forbidden");
+  if (session.role !== "super_admin") redirect("/newsroom?error=forbidden");
   return session;
 }
 
 // ---------- Staff management (super admin only) ----------
 
 const STAFF_ROLES = ["super_admin", "admin", "editor", "author"];
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+// Adds a staff account. The super admin sets the person's password (required) and
+// shares it with them privately; they can change it on their Profile page. No email
+// is involved, so this works even when email isn't set up.
+export async function addStaffAction(formData) {
+  await requireSuperAdmin();
+  const name = String(formData.get("name") || "").trim();
+  const email = String(formData.get("email") || "").toLowerCase().trim();
+  const role = String(formData.get("role") || "");
+  const password = String(formData.get("password") || ""); // not trimmed: spaces are valid
+  const back = (msg) => redirect(`/newsroom/staff?error=${encodeURIComponent(msg)}`);
+
+  if (!name) back("Enter the person's name.");
+  if (!EMAIL_RE.test(email)) back("Enter a valid email address.");
+  if (!STAFF_ROLES.includes(role)) back("Choose a role.");
+  if (!password.trim()) back("Enter a password for the new staff member.");
+  if (password.length < 8) back("The password must be at least 8 characters.");
+
+  const exists = await prisma.user.findUnique({ where: { email }, select: { id: true } });
+  if (exists) back("A staff account with that email already exists.");
+
+  await prisma.user.create({
+    data: { name, email, role, password: await hashPassword(password) },
+  });
+  revalidatePath("/newsroom/staff");
+  redirect(`/newsroom/staff?added=${encodeURIComponent(email)}`);
+}
 
 export async function updateStaffRoleAction(formData) {
   const session = await requireSuperAdmin();
   const userId = String(formData.get("userId") || "");
   const role = String(formData.get("role") || "");
-  if (!STAFF_ROLES.includes(role)) redirect("/admin/staff");
+  if (!STAFF_ROLES.includes(role)) redirect("/newsroom/staff");
 
   if (userId === session.id && role !== "super_admin") {
     const superAdminCount = await prisma.user.count({ where: { role: "super_admin" } });
     if (superAdminCount <= 1) {
-      redirect(`/admin/staff?error=${encodeURIComponent("You can't remove the last super admin.")}`);
+      redirect(`/newsroom/staff?error=${encodeURIComponent("You can't remove the last super admin.")}`);
     }
   }
 
   await prisma.user.update({ where: { id: userId }, data: { role } });
-  revalidatePath("/admin/staff");
-  redirect("/admin/staff?saved=1");
+  revalidatePath("/newsroom/staff");
+  redirect("/newsroom/staff?saved=1");
 }
 
 export async function deleteStaffAction(formData) {
@@ -385,21 +220,21 @@ export async function deleteStaffAction(formData) {
   const userId = String(formData.get("userId") || "");
 
   if (userId === session.id) {
-    redirect(`/admin/staff?error=${encodeURIComponent("You can't delete your own account while signed in.")}`);
+    redirect(`/newsroom/staff?error=${encodeURIComponent("You can't delete your own account while signed in.")}`);
   }
 
   const articleCount = await prisma.article.count({ where: { authorId: userId } });
   if (articleCount > 0) {
     redirect(
-      `/admin/staff?error=${encodeURIComponent(
+      `/newsroom/staff?error=${encodeURIComponent(
         `This account has authored ${articleCount} article(s). Reassign or delete those first.`
       )}`
     );
   }
 
   await prisma.user.delete({ where: { id: userId } }).catch(() => {});
-  revalidatePath("/admin/staff");
-  redirect("/admin/staff?deleted=1");
+  revalidatePath("/newsroom/staff");
+  redirect("/newsroom/staff?deleted=1");
 }
 
 // ---------- Staff profile ----------
@@ -438,7 +273,7 @@ export async function updateStaffProfileAction(_prevState, formData) {
     data: { name, username: username || null, dateOfBirth, city, address, bio, profession },
   });
 
-  revalidatePath("/admin/profile");
+  revalidatePath("/newsroom/profile");
   return { ok: "Profile saved." };
 }
 
@@ -453,8 +288,8 @@ export async function updateStaffAvatarAction(formData) {
     await prisma.user.update({ where: { id: session.id }, data: { avatarUrl: result.url } });
     if (prev?.avatarUrl && prev.avatarUrl !== result.url) await deleteUpload(prev.avatarUrl);
   }
-  revalidatePath("/admin/profile");
-  redirect(`/admin/profile${result.error ? `?imgerror=${encodeURIComponent(result.error)}` : ""}`);
+  revalidatePath("/newsroom/profile");
+  redirect(`/newsroom/profile${result.error ? `?imgerror=${encodeURIComponent(result.error)}` : ""}`);
 }
 
 export async function changeStaffPasswordAction(_prevState, formData) {
@@ -491,7 +326,7 @@ export async function newDraftAction() {
       authorId: session.id,
     },
   });
-  redirect(`/admin/articles/${draft.id}/edit`);
+  redirect(`/newsroom/articles/${draft.id}/edit`);
 }
 
 export async function saveArticleAction(_prevState, formData) {
@@ -553,11 +388,11 @@ export async function saveArticleAction(_prevState, formData) {
     : await prisma.article.create({ data: { ...data, authorId: session.id } });
 
   revalidatePath("/");
-  revalidatePath("/admin");
+  revalidatePath("/newsroom");
   revalidatePath(`/article/${article.slug}`);
   revalidatePath(`/section/${(await prisma.category.findUnique({ where: { id: categoryId } }))?.slug ?? ""}`);
 
-  redirect("/admin?saved=1");
+  redirect("/newsroom?saved=1");
 }
 
 export async function deleteArticleAction(formData) {
@@ -566,9 +401,9 @@ export async function deleteArticleAction(formData) {
   if (id) {
     await prisma.article.delete({ where: { id } });
     revalidatePath("/");
-    revalidatePath("/admin");
+    revalidatePath("/newsroom");
   }
-  redirect("/admin?deleted=1");
+  redirect("/newsroom?deleted=1");
 }
 
 // ---------- Article images ----------
@@ -579,13 +414,13 @@ async function revalidateArticle(articleId) {
     select: { slug: true },
   });
   revalidatePath("/");
-  revalidatePath("/admin");
+  revalidatePath("/newsroom");
   if (a) revalidatePath(`/article/${a.slug}`);
 }
 
 function backToEdit(id, error) {
   redirect(
-    `/admin/articles/${id}/edit${error ? `?imgerror=${encodeURIComponent(error)}` : ""}`
+    `/newsroom/articles/${id}/edit${error ? `?imgerror=${encodeURIComponent(error)}` : ""}`
   );
 }
 
@@ -682,10 +517,10 @@ export async function removeArticleImageAction(formData) {
   backToEdit(articleId);
 }
 
-// ---------- Advertisements ----------
+// ---------- Advertisements (super admin only) ----------
 
 export async function setAdImageAction(formData) {
-  await requireSession();
+  await requireSuperAdmin();
   const id = String(formData.get("id") || "");
   const result = await saveUpload(formData.get("file"));
   if (result.url) {
@@ -698,29 +533,29 @@ export async function setAdImageAction(formData) {
       await deleteUpload(prev.imageUrl);
     }
     revalidatePath("/");
-    revalidatePath("/admin/ads");
+    revalidatePath("/newsroom/ads");
   }
   redirect(
-    `/admin/ads${
+    `/newsroom/ads${
       result.error ? `?imgerror=${encodeURIComponent(result.error)}` : "?saved=1"
     }`
   );
 }
 
 export async function setAdImageUrlAction(formData) {
-  await requireSession();
+  await requireSuperAdmin();
   const id = String(formData.get("id") || "");
   const url = String(formData.get("url") || "").trim();
   if (url) {
     await prisma.ad.update({ where: { id }, data: { imageUrl: url } });
     revalidatePath("/");
-    revalidatePath("/admin/ads");
+    revalidatePath("/newsroom/ads");
   }
-  redirect("/admin/ads?saved=1");
+  redirect("/newsroom/ads?saved=1");
 }
 
 export async function saveAdAction(formData) {
-  await requireSession();
+  await requireSuperAdmin();
   const id = String(formData.get("id") || "");
   await prisma.ad.update({
     where: { id },
@@ -732,12 +567,12 @@ export async function saveAdAction(formData) {
     },
   });
   revalidatePath("/");
-  revalidatePath("/admin/ads");
-  redirect("/admin/ads?saved=1");
+  revalidatePath("/newsroom/ads");
+  redirect("/newsroom/ads?saved=1");
 }
 
 export async function clearAdImageAction(formData) {
-  await requireSession();
+  await requireSuperAdmin();
   const id = String(formData.get("id") || "");
   const prev = await prisma.ad.findUnique({
     where: { id },
@@ -746,8 +581,8 @@ export async function clearAdImageAction(formData) {
   await prisma.ad.update({ where: { id }, data: { imageUrl: "" } });
   if (prev?.imageUrl) await deleteUpload(prev.imageUrl);
   revalidatePath("/");
-  revalidatePath("/admin/ads");
-  redirect("/admin/ads?saved=1");
+  revalidatePath("/newsroom/ads");
+  redirect("/newsroom/ads?saved=1");
 }
 
 // ---------- e-Paper editions ----------
@@ -764,7 +599,7 @@ export async function newEditionAction() {
   const today = dayStartUTC();
   let edition = await prisma.edition.findFirst({ where: { date: today } });
   if (!edition) edition = await prisma.edition.create({ data: { date: today } });
-  redirect(`/admin/editions/${edition.id}/edit`);
+  redirect(`/newsroom/editions/${edition.id}/edit`);
 }
 
 export async function saveEditionAction(_prevState, formData) {
@@ -791,7 +626,7 @@ export async function saveEditionAction(_prevState, formData) {
 
   revalidatePath("/epaper");
   revalidatePath(`/epaper/${toISODate(parsed)}`);
-  revalidatePath("/admin/editions");
+  revalidatePath("/newsroom/editions");
   return { ok: "Edition details saved." };
 }
 
@@ -802,9 +637,9 @@ export async function deleteEditionAction(formData) {
     await prisma.editionItem.deleteMany({ where: { editionId: id } });
     await prisma.edition.delete({ where: { id } });
     revalidatePath("/epaper");
-    revalidatePath("/admin/editions");
+    revalidatePath("/newsroom/editions");
   }
-  redirect("/admin/editions?deleted=1");
+  redirect("/newsroom/editions?deleted=1");
 }
 
 export async function addEditionItemAction(formData) {
@@ -823,7 +658,7 @@ export async function addEditionItemAction(formData) {
     });
     await touchEdition(editionId);
   }
-  redirect(`/admin/editions/${editionId}/edit`);
+  redirect(`/newsroom/editions/${editionId}/edit`);
 }
 
 export async function updateEditionItemAction(formData) {
@@ -839,7 +674,7 @@ export async function updateEditionItemAction(formData) {
     data: { page, order, prominence },
   });
   await touchEdition(editionId);
-  redirect(`/admin/editions/${editionId}/edit`);
+  redirect(`/newsroom/editions/${editionId}/edit`);
 }
 
 export async function removeEditionItemAction(formData) {
@@ -848,14 +683,14 @@ export async function removeEditionItemAction(formData) {
   const editionId = String(formData.get("editionId") || "");
   await prisma.editionItem.delete({ where: { id } });
   await touchEdition(editionId);
-  redirect(`/admin/editions/${editionId}/edit`);
+  redirect(`/newsroom/editions/${editionId}/edit`);
 }
 
 export async function autofillEditionAction(formData) {
   await requireSession();
   const editionId = String(formData.get("editionId") || "");
   const edition = await prisma.edition.findUnique({ where: { id: editionId } });
-  if (!edition) redirect("/admin/editions");
+  if (!edition) redirect("/newsroom/editions");
 
   const start = dayStartUTC(edition.date);
   const end = new Date(start);
@@ -897,5 +732,5 @@ export async function autofillEditionAction(formData) {
     idx++;
   }
   await touchEdition(editionId);
-  redirect(`/admin/editions/${editionId}/edit`);
+  redirect(`/newsroom/editions/${editionId}/edit`);
 }

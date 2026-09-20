@@ -55,7 +55,7 @@ export default async function EditionsListPage({ searchParams }) {
               return (
                 <tr key={e.id}>
                   <td className="t-title">
-                    <Link href={`/admin/editions/${e.id}/edit`}>
+                    <Link href={`/newsroom/editions/${e.id}/edit`}>
                       {formatLongDate(e.date)}
                     </Link>
                   </td>
@@ -75,7 +75,7 @@ export default async function EditionsListPage({ searchParams }) {
                     <div className="t-actions">
                       <Link
                         className="a-btn"
-                        href={`/admin/editions/${e.id}/edit`}
+                        href={`/newsroom/editions/${e.id}/edit`}
                       >
                         Edit
                       </Link>
